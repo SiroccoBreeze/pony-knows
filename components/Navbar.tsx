@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle"
+import { ThemeToggleColor } from "@/components/theme-toggle-color"
 
 const Navbar = () => {
   return (
@@ -109,11 +110,12 @@ const Navbar = () => {
             </NavigationMenuList>
           </NavigationMenu>
 
-          {/* 登录按钮 */}
+          {/* 登录按钮和主题切换 */}
           <div className="flex items-center space-x-4">            
             <Button variant="outline">登录</Button>
             <Button>注册</Button>
             <ThemeToggle />
+            <ThemeToggleColor />
           </div>
         </div>
       </div>

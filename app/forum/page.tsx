@@ -44,10 +44,10 @@ export default function ForumPage() {
     <div className="container mx-auto py-4">
       <div className="flex gap-4">
         {/* 左侧边栏 */}
-        <ForumSidebar className="w-44 hidden lg:block fixed left-0 h-screen" />
+        <ForumSidebar className="w-[15vw] hidden lg:block fixed left-0 h-screen" />
 
         {/* 问题列表 */}
-        <main className="flex-1 min-w-0 ml-44 max-w-4xl mx-auto">
+        <main className="flex-1 min-w-0 ml-44 max-w-[60vw] mx-auto">
           {/* 顶部操作区 */}
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1 max-w-md">
@@ -169,7 +169,7 @@ export default function ForumPage() {
         </main>
 
         {/* 右侧热门标签 */}
-        <aside className="w-56 hidden xl:block fixed right-0 top-0 h-screen overflow-y-auto">
+        <aside className="w-[15vw] hidden xl:block fixed right-0 h-screen overflow-y-auto">
           <div className="bg-card rounded-lg p-3">
             <h3 className="font-medium text-sm mb-2">热门标签</h3>
             <div className="space-y-1">

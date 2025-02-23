@@ -28,9 +28,9 @@ export default function TagsPage() {
   return (
     <div className="container mx-auto py-4">
       <div className="flex gap-4">
-        <ForumSidebar className="w-44 hidden lg:block" />
+        <ForumSidebar className="w-[15vw] hidden lg:block fixed left-0 h-screen" />
 
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 ml-44 max-w-[60vw] mx-auto">
           {/* 标题和搜索区域 - 减小底部间距 */}
           <div className="mb-4">
             <div className="flex items-center gap-3 mb-3">
