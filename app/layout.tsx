@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import Navbar from "@/components/Navbar"
+import Footer from "@/components/Footer"
+import { themeScript } from "@/lib/theme-script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,9 +27,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="zh" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: themeScript,
+          }}
+        />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <ThemeProvider
           attribute="class"
@@ -36,9 +45,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Navbar />
-          <main className="pt-16">
+          <main className="flex-1 pt-16">
             {children}
           </main>
+          <Footer />
         </ThemeProvider>
       </body>
     </html>

@@ -1,4 +1,3 @@
-import { Footer } from "@/components/Footer"
 import Navbar from "@/components/Navbar"
 
 export default function ForumLayout({
@@ -13,7 +12,6 @@ export default function ForumLayout({
         <div className="flex-1 overflow-auto">
           {children}
         </div>
-        <Footer />
       </div>
     </div>
   )

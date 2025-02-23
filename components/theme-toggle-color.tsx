@@ -23,35 +23,36 @@ const themes = {
   rose: {
     name: "rose",
     activeColor: "bg-primary"
+  },
+  green: {
+    name: "green",
+    activeColor: "bg-primary"
   }
-}
-
-// 获取初始主题
-const getInitialTheme = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('color-theme') || 'zinc'
-  }
-  return 'zinc'
 }
 
 export function ThemeToggleColor() {
   const [mounted, setMounted] = useState(false)
-  const [currentTheme, setCurrentTheme] = useState(getInitialTheme)
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.getAttribute('data-theme') || 'zinc'
+    }
+    return 'zinc'
+  })
   
-  // 在组件挂载时设置主题
   useEffect(() => {
-    const savedTheme = getInitialTheme()
-    document.documentElement.setAttribute('data-theme', savedTheme)
     setMounted(true)
   }, [])
 
   const setTheme = (theme: string) => {
     setCurrentTheme(theme)
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('color-theme', theme)
+    try {
+      localStorage.setItem('color-theme', theme)
+    } catch (e) {
+      console.error('Failed to save theme to localStorage:', e)
+    }
   }
 
-  // 在未挂载时返回预渲染的按钮，避免闪烁
   if (!mounted) {
     return (
       <Button variant="ghost" size="icon">
@@ -81,7 +82,7 @@ export function ThemeToggleColor() {
             >
               <button
                 onClick={() => setTheme(key)}
-                className={`h-8 w-full rounded-md ring-offset-background transition-all hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                className={`h-8 w-full rounded-md ring-offset-background transition-colors hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                   theme.activeColor
                 } ${
                   currentTheme === key ? 'ring-2 ring-ring ring-offset-2' : ''
