@@ -44,7 +44,7 @@ export default function ForumPage() {
     <div className="container mx-auto py-4">
       <div className="flex gap-4">
         {/* 左侧边栏 */}
-        <ForumSidebar className="w-[15vw] hidden lg:block fixed left-0 h-screen" />
+        <ForumSidebar className="w-[10vw] hidden lg:block fixed left-0 h-screen" />
 
         {/* 问题列表 */}
         <main className="flex-1 min-w-0 ml-44 max-w-[60vw] mx-auto">
