@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "./ui/button";
@@ -13,8 +15,12 @@ import {
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ThemeToggleColor } from "@/components/theme-toggle-color"
+import { UserMenu } from "@/components/auth/user-menu";
+import { useAuth } from "@/lib/auth";
 
 const Navbar = () => {
+  const { user } = useAuth();
+  
   return (
     <nav className="fixed top-0 w-full bg-background border-b z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -111,9 +117,19 @@ const Navbar = () => {
           </NavigationMenu>
 
           {/* 登录按钮和主题切换 */}
-          <div className="flex items-center space-x-4">            
-            <Button variant="outline">登录</Button>
-            <Button>注册</Button>
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <UserMenu />
+            ) : (
+              <>
+                <Link href="/auth/login">
+                  <Button variant="outline">登录</Button>
+                </Link>
+                <Link href="/auth/register">
+                  <Button>注册</Button>
+                </Link>
+              </>
+            )}
             <ThemeToggle />
             <ThemeToggleColor />
           </div>

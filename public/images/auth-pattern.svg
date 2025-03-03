@@ -1,0 +1,28 @@
+<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="smallGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" stroke-width="0.5" opacity="0.2"/>
+    </pattern>
+    <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="100" height="100" fill="url(#smallGrid)"/>
+      <path d="M 100 0 L 0 0 0 100" fill="none" stroke="white" stroke-width="1" opacity="0.2"/>
+    </pattern>
+    <pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1" fill="white" opacity="0.3"/>
+    </pattern>
+    <pattern id="circles" width="100" height="100" patternUnits="userSpaceOnUse">
+      <circle cx="50" cy="50" r="20" fill="none" stroke="white" stroke-width="0.5" opacity="0.2"/>
+    </pattern>
+  </defs>
+  
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+  <rect width="100%" height="100%" fill="url(#dots)"/>
+  <rect width="100%" height="100%" fill="url(#circles)"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="10%" cy="20%" r="50" fill="white" opacity="0.03"/>
+  <circle cx="85%" cy="60%" r="100" fill="white" opacity="0.03"/>
+  <circle cx="40%" cy="90%" r="70" fill="white" opacity="0.03"/>
+  
+  <path d="M0,0 L100,100 M100,0 L0,100" stroke="white" stroke-width="0.5" opacity="0.05" transform="scale(50)"/>
+</svg> 
