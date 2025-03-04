@@ -177,7 +177,7 @@ export default function LoginPage() {
           <p className="text-center text-sm text-muted-foreground">
             还没有账户？{" "}
             <Link
-              href="../register"
+              href="/auth/register"
               className="font-medium text-primary hover:underline"
             >
               立即注册
