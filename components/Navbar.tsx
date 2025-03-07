@@ -16,11 +16,18 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ThemeToggleColor } from "@/components/theme-toggle-color"
 import { UserMenu } from "@/components/auth/user-menu";
-import { useAuth } from "@/lib/auth";
+import { useEffect, useState } from "react";
+import { useUserStore } from "@/store";
 
 const Navbar = () => {
-  const { user } = useAuth();
+  const { user, isLoggedIn } = useUserStore();
+  const [mounted, setMounted] = useState(false);
   
+  // 确保组件只在客户端渲染后显示
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <nav className="fixed top-0 w-full bg-background border-b z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -28,7 +35,7 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link href="/" className="text-xl font-bold">
-              PnoyKonws
+              PonyKnows
             </Link>
           </div>
 
@@ -118,8 +125,13 @@ const Navbar = () => {
 
           {/* 登录按钮和主题切换 */}
           <div className="flex items-center space-x-4">
-            {user ? (
-              <UserMenu />
+            <ThemeToggle />
+            <ThemeToggleColor />
+            {!mounted ? (
+              // 加载状态 - 显示占位符
+              <div className="w-8 h-8"></div>
+            ) : isLoggedIn ? (
+              <UserMenu user={user!} />
             ) : (
               <>
                 <Link href="/auth/login">
@@ -130,8 +142,6 @@ const Navbar = () => {
                 </Link>
               </>
             )}
-            <ThemeToggle />
-            <ThemeToggleColor />
           </div>
         </div>
       </div>

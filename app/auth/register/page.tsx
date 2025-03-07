@@ -16,8 +16,14 @@ export default function RegisterPage() {
   React.useEffect(() => {
     if (user) {
       router.push("/");
+      router.refresh(); // 强制刷新页面以更新状态
     }
   }, [user, router]);
+
+  const handleRegisterSuccess = () => {
+    router.push("/");
+    router.refresh(); // 强制刷新页面以更新状态
+  };
 
   return (
     <div className="flex min-h-screen w-full">
@@ -129,7 +135,7 @@ export default function RegisterPage() {
             </p>
           </div>
           
-          <RegisterForm onSuccess={() => router.push("../login")} />
+          <RegisterForm onSuccess={handleRegisterSuccess} />
           
           <div className="space-y-4">
             <div className="relative">

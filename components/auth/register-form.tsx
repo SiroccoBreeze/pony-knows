@@ -15,10 +15,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useEffect } from "react";
 
 // 注册表单验证模式
 const registerFormSchema = z.object({
-  username: z.string().min(2, {
+  name: z.string().min(2, {
     message: "用户名至少需要2个字符",
   }),
   email: z.string().email({
@@ -41,14 +42,19 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ onSuccess }: RegisterFormProps) {
-  const { register } = useAuth();
-  const [isLoading, setIsLoading] = React.useState(false);
+  const { register, error: authError, loading } = useAuth();
   const [error, setError] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
     defaultValues: {
-      username: "",
+      name: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -56,13 +62,12 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
   });
 
   async function onSubmit(data: RegisterFormValues) {
-    setIsLoading(true);
     setError(null);
     
     try {
       // 调用注册函数
       const success = await register({
-        username: data.username,
+        name: data.name,
         email: data.email,
         password: data.password
       });
@@ -70,13 +75,9 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       if (success) {
         form.reset();
         onSuccess?.();
-      } else {
-        setError("注册失败，请稍后重试");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "注册时发生错误");
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -85,7 +86,7 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           control={form.control}
-          name="username"
+          name="name"
           render={({ field }) => (
             <FormItem>
               <FormLabel>用户名</FormLabel>
@@ -138,8 +139,8 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
         {error && (
           <div className="text-sm font-medium text-destructive">{error}</div>
         )}
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "注册中..." : "注册"}
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "注册中..." : "注册"}
         </Button>
       </form>
     </Form>

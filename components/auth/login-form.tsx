@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useEffect } from "react";
 
 // 登录表单验证模式
 const loginFormSchema = z.object({
@@ -64,9 +65,14 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSuccess }: LoginFormProps) {
-  const { login } = useAuth();
-  const [isLoading, setIsLoading] = React.useState(false);
+  const { login, error: authError, loading } = useAuth();
   const [error, setError] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -77,7 +83,6 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   });
 
   async function onSubmit(data: LoginFormValues) {
-    setIsLoading(true);
     setError(null);
     
     try {
@@ -85,13 +90,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       if (success) {
         form.reset();
         onSuccess?.();
-      } else {
-        setError("登录失败，请检查您的凭据");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录时发生错误");
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -127,8 +128,8 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         {error && (
           <div className="text-sm font-medium text-destructive">{error}</div>
         )}
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "登录中..." : "登录"}
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "登录中..." : "登录"}
         </Button>
       </form>
     </Form>

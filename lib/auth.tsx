@@ -1,17 +1,21 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { signIn, signOut, useSession } from "next-auth/react";
+import { SessionProvider } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useUserStore } from '@/store'; // 导入Zustand状态
 
 // 用户类型定义
 export interface User {
   id: string;
-  username: string;
+  name?: string;
   email: string;
 }
 
 // 注册数据类型
 export interface RegisterData {
-  username: string;
+  name: string;
   email: string;
   password: string;
 }
@@ -22,113 +26,123 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (data: RegisterData) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   error: string | null;
 }
 
 // 创建认证上下文
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 认证提供者组件
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+// 认证提供者组件的内部组件
+function AuthProviderContent({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { data: session, status, update } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const loading = status === "loading" || isLoading;
+  const user = session?.user as User | null;
+  
+  // 获取Zustand状态更新函数
+  const zustandLogin = useUserStore(state => state.login);
+  const zustandLogout = useUserStore(state => state.logout);
 
-  // 检查本地存储中是否有用户信息
+  // 当会话状态变化时更新Zustand状态
   useEffect(() => {
-    // 确保代码在浏览器环境中运行
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (e) {
-          localStorage.removeItem('user');
-        }
-      }
+    if (status === "authenticated" && session?.user) {
+      // 将next-auth用户数据转换为Zustand用户数据
+      const zustandUser = {
+        id: session.user.email || 'user-id', // 使用email作为id
+        name: session.user.name || '',
+        email: session.user.email || '',
+      };
+      // 更新Zustand状态
+      zustandLogin(zustandUser);
+    } else if (status === "unauthenticated") {
+      // 用户未认证，清除Zustand状态
+      zustandLogout();
     }
-    setLoading(false);
-  }, []);
-
-  // 注册函数
-  const register = async (data: RegisterData): Promise<boolean> => {
-    setLoading(true);
-    setError(null);
     
-    try {
-      // 这里应该是实际的API调用，现在我们模拟一个成功的注册
-      // 在实际应用中，替换为真实的API调用
-      if (data.email && data.password && data.username) {
-        // 模拟API延迟
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // 模拟用户数据
-        const userData: User = {
-          id: Math.random().toString(36).substring(2, 9),
-          username: data.username,
-          email: data.email
-        };
-        
-        // 保存到状态和本地存储
-        setUser(userData);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(userData));
-        }
-        setLoading(false);
-        return true;
-      } else {
-        throw new Error('请提供完整的注册信息');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '注册失败');
-      setLoading(false);
-      return false;
-    }
-  };
+    // 避免在状态变化时总是刷新页面，这可能导致在404页面上无限循环
+    // 只在特定情况下刷新页面，例如登录或注销后
+  }, [status, session, router, zustandLogin, zustandLogout]);
 
   // 登录函数
   const login = async (email: string, password: string): Promise<boolean> => {
-    setLoading(true);
     setError(null);
+    setIsLoading(true);
     
     try {
-      // 这里应该是实际的API调用，现在我们模拟一个成功的登录
-      // 在实际应用中，替换为真实的API调用
-      if (email && password) {
-        // 模拟API延迟
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 模拟用户数据
-        const userData: User = {
-          id: '1',
-          username: email.split('@')[0],
-          email
-        };
-        
-        // 保存到状态和本地存储
-        setUser(userData);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(userData));
-        }
-        setLoading(false);
-        return true;
-      } else {
-        throw new Error('请提供有效的邮箱和密码');
+      const result = await signIn("credentials", {
+        redirect: false,
+        email,
+        password
+      });
+      
+      if (!result) {
+        setError("登录请求失败，请稍后重试");
+        return false;
       }
+      
+      if (result.error) {
+        setError(result.error || "登录失败");
+        return false;
+      }
+      
+      // 强制更新会话
+      await update();
+      router.refresh();
+      
+      return result.ok || false;
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
-      setLoading(false);
+      console.error("登录错误:", err);
+      setError(err instanceof Error ? err.message : "登录失败");
       return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 注册函数
+  const register = async (data: RegisterData): Promise<boolean> => {
+    setError(null);
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "注册失败，请稍后重试" }));
+        setError(errorData.error || "注册失败");
+        return false;
+      }
+      
+      // 注册成功后自动登录
+      return await login(data.email, data.password);
+    } catch (err) {
+      console.error("注册错误:", err);
+      setError(err instanceof Error ? err.message : "注册失败");
+      return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // 注销函数
-  const logout = () => {
-    setUser(null);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('user');
+  const logout = async (): Promise<void> => {
+    setIsLoading(true);
+    try {
+      await signOut({ redirect: false });
+      // 直接调用Zustand的logout函数，确保状态立即更新
+      zustandLogout();
+      router.refresh();
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -139,6 +153,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// 认证提供者组件
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <SessionProvider>
+      <AuthProviderContent>{children}</AuthProviderContent>
+    </SessionProvider>
+  );
+}
+
 // 使用认证的自定义Hook
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -146,4 +169,4 @@ export function useAuth() {
     throw new Error('useAuth必须在AuthProvider内部使用');
   }
   return context;
-} 
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { LoginForm } from "@/components/auth/login-form";
 import Link from "next/link";
@@ -10,14 +10,22 @@ import { ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/';
   const { user } = useAuth();
   
-  // 如果用户已登录，重定向到首页
+  // 如果用户已登录，重定向到回调URL
   React.useEffect(() => {
     if (user) {
-      router.push("/");
+      router.push(callbackUrl);
+      router.refresh(); // 强制刷新页面以更新状态
     }
-  }, [user, router]);
+  }, [user, router, callbackUrl]);
+
+  const handleLoginSuccess = () => {
+    router.push(callbackUrl);
+    router.refresh(); // 强制刷新页面以更新状态
+  };
 
   return (
     <div className="flex min-h-screen w-full">
@@ -130,7 +138,7 @@ export default function LoginPage() {
             </p>
           </div>
           
-          <LoginForm onSuccess={() => router.push("/")} />
+          <LoginForm onSuccess={handleLoginSuccess} />
           
           <div className="space-y-4">
             <div className="relative">

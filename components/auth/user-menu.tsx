@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,33 +10,62 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User } from "lucide-react";
+import { User as UserIcon, Settings, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "@/lib/auth";
+import type { User } from "@/store/useUserStore";
+import Link from "next/link";
 
-export function UserMenu() {
-  const { user, logout } = useAuth();
+interface UserMenuProps {
+  user: User;
+}
 
-  if (!user) {
-    return null;
-  }
+export function UserMenu({ user }: UserMenuProps) {
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      router.refresh(); // 强制刷新页面以更新状态
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative rounded-full">
-          <User className="h-5 w-5" />
-          <span className="sr-only">用户菜单</span>
+        <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
+          <div className="flex items-center justify-center w-full h-full">
+            <UserIcon className="h-5 w-5" />
+          </div>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>我的账户</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+          </div>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
-          <span className="font-medium">{user.username}</span>
+        <DropdownMenuItem asChild>
+          <Link href="/user/profile" className="flex items-center cursor-pointer">
+            <Settings className="mr-2 h-4 w-4" />
+            <span>用户管理</span>
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>{user.email}</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => logout()}>
-          注销
+        <DropdownMenuItem 
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="cursor-pointer"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>{isLoggingOut ? "注销中..." : "注销"}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

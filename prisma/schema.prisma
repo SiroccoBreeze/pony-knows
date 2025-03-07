@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  posts         Post[]
+  comments      Comment[]
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// NextAuth.js 所需表 - 第三方账户
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// NextAuth.js 所需表 - 会话
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// NextAuth.js 所需表 - 验证令牌
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// 帖子表
+model Post {
+  id        String      @id @default(uuid())
+  title     String
+  content   String
+  author    User        @relation(fields: [authorId], references: [id])
+  authorId  String
+  comments  Comment[]
+  tags      Tag[]       @relation("PostToTag") // 反向关系字段
+  postTags  PostToTag[] // 明确反向关系字段
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// 评论表
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 标签表
+model Tag {
+  id        String      @id @default(uuid())
+  name      String      @unique
+  posts     Post[]      @relation("PostToTag") // 反向关系字段
+  postTags  PostToTag[] // 明确反向关系字段
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+// 帖子与标签关联表（多对多关系）
+model PostToTag {
+  postId    String
+  tagId     String
+  post      Post     @relation(fields: [postId], references: [id])
+  tag       Tag      @relation(fields: [tagId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@id([postId, tagId])
+}
