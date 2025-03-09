@@ -77,6 +77,7 @@ model Post {
   comments  Comment[]
   tags      Tag[]       @relation("PostToTag") // 反向关系字段
   postTags  PostToTag[] // 明确反向关系字段
+  status    String
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 }
