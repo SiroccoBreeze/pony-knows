@@ -45,6 +45,7 @@ export default function NewPostPage() {
   const router = useRouter();
   const editorRef = useRef<VditorEditorRef>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const contentRef = useRef(""); // 使用 ref 来存储内容
   const { user } = useUserStore();
 
   // 初始化表单
@@ -58,17 +59,41 @@ export default function NewPostPage() {
     },
   });
 
+  // 同步编辑器内容到 ref
   const handleContentChange = (value: string) => {
-    form.setValue("content", value);
+    contentRef.current = value;
+    form.setValue("content", value, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: false,
+    });
   };
 
+  // 保持编辑器内容
+  React.useEffect(() => {
+    if (editorRef.current && contentRef.current) {
+      const editor = editorRef.current;
+      editor.clear();
+      editor.getInstance().setValue(contentRef.current);
+    }
+  }, [form.formState.submitCount]); // 仅在表单提交后重新设置内容
+
   // 保存草稿
-  const saveDraft = () => {
-    const { title, tags } = form.getValues();
-    
+  const saveDraft = async () => {
     // 验证必填字段
-    if (!title || !tags) {
-      form.trigger();
+    const result = await form.trigger(["title", "tags"]);
+    if (!result) {
+      return;
+    }
+    
+    // 验证内容不能为空
+    if (!contentRef.current.trim()) {
+      toast({
+        title: "提示",
+        description: "请输入帖子内容",
+        variant: "default",
+        action: <ToastAction altText="close">关闭</ToastAction>,
+      });
       return;
     }
     
@@ -81,9 +106,19 @@ export default function NewPostPage() {
   const onSubmit = async (values: FormValues) => {
     try {
       setIsLoading(true);
+      
+      // 验证内容不能为空
+      if (!contentRef.current.trim()) {
+        toast({
+          title: "提示",
+          description: "请输入帖子内容",
+          variant: "default",
+          action: <ToastAction altText="close">关闭</ToastAction>,
+        });
+        setIsLoading(false);
+        return;
+      }
 
-      // 获取编辑器内容
-      const editorContent = editorRef.current?.getValue() || "";
       const status = values.status;
 
       // 准备提交的数据
@@ -93,7 +128,7 @@ export default function NewPostPage() {
           .split(",")
           .map((tag) => tag.trim())
           .filter(Boolean),
-        content: editorContent,
+        content: contentRef.current,
         authorId: user?.id || "anonymous",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
