@@ -55,13 +55,13 @@ interface Tag {
 }
 
 interface PostEditPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function PostEditPage({ params }: PostEditPageProps) {
-  const { id } = params;
+  const { id } = React.use(params);
   const router = useRouter();
   const editorRef = useRef<VditorEditorRef>(null);
   const [isLoading, setIsLoading] = useState(false);

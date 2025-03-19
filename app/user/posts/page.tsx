@@ -1,51 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Eye, MessageSquare, ThumbsUp } from "lucide-react";
+import { Edit, Trash2, Eye, MessageSquare } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
-// 模拟帖子数据
-const mockPosts = [
-  {
-    id: "1",
-    title: "如何提高工作效率：10个实用技巧",
-    excerpt: "在当今快节奏的工作环境中，提高效率变得越来越重要...",
-    createdAt: "2023-05-15T10:30:00Z",
-    status: "published",
-    views: 1245,
-    likes: 87,
-    comments: 32,
-  },
-  {
-    id: "2",
-    title: "2023年最值得学习的编程语言",
-    excerpt: "随着技术的不断发展，编程语言的受欢迎程度也在不断变化...",
-    createdAt: "2023-06-22T14:15:00Z",
-    status: "published",
-    views: 876,
-    likes: 54,
-    comments: 18,
-  },
-  {
-    id: "3",
-    title: "远程工作的挑战与应对策略",
-    excerpt: "远程工作已经成为许多公司的标准工作模式，但它也带来了一系列挑战...",
-    createdAt: "2023-07-10T09:45:00Z",
-    status: "draft",
-    views: 0,
-    likes: 0,
-    comments: 0,
-  },
-];
+// 定义帖子类型
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+  status: "draft" | "published";
+  createdAt: string;
+  updatedAt: string;
+  author: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  postTags: {
+    tag: {
+      id: string;
+      name: string;
+    };
+  }[];
+  _count: {
+    comments: number;
+  };
+}
+
+// 扩展 Session 类型
+interface ExtendedSession {
+  user?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
+}
 
 export default function PostsPage() {
   const [activeTab, setActiveTab] = useState("published");
-  const [posts, setPosts] = useState(mockPosts);
-  
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { data: session } = useSession() as { data: ExtendedSession | null };
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      router.push("/login");
+      return;
+    }
+
+    const fetchPosts = async () => {
+      try {
+        const userId = session.user.id;
+        const response = await fetch(`/api/posts?authorId=${userId}`);
+        if (!response.ok) {
+          throw new Error("获取帖子失败");
+        }
+        const data = await response.json();
+        setPosts(data);
+      } catch (error) {
+        console.error("获取帖子失败:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, [session, router]);
+
   // 根据状态筛选帖子
   const filteredPosts = posts.filter(post => 
     activeTab === "all" || post.status === activeTab
@@ -62,11 +92,28 @@ export default function PostsPage() {
   };
   
   // 删除帖子
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("确定要删除这篇帖子吗？此操作无法撤销。")) {
-      setPosts(posts.filter(post => post.id !== id));
+      try {
+        const response = await fetch(`/api/posts/${id}`, {
+          method: "DELETE",
+        });
+        
+        if (!response.ok) {
+          throw new Error("删除帖子失败");
+        }
+        
+        setPosts(posts.filter(post => post.id !== id));
+      } catch (error) {
+        console.error("删除帖子失败:", error);
+        alert("删除帖子失败，请稍后重试");
+      }
     }
   };
+
+  if (loading) {
+    return <div className="text-center py-12">加载中...</div>;
+  }
   
   return (
     <div className="space-y-6">
@@ -79,7 +126,7 @@ export default function PostsPage() {
         </Button>
       </div>
       
-      <Tabs defaultValue="published" onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="published">已发布</TabsTrigger>
           <TabsTrigger value="draft">草稿</TabsTrigger>
@@ -108,28 +155,22 @@ export default function PostsPage() {
                       </Badge>
                     </div>
                   </CardHeader>
+                  
                   <CardContent>
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {post.excerpt}
+                      {post.content.substring(0, 200)}...
                     </p>
                     
                     {post.status === "published" && (
                       <div className="flex gap-4 mt-4">
                         <div className="flex items-center text-sm text-muted-foreground">
-                          <Eye className="h-4 w-4 mr-1" />
-                          <span>{post.views} 浏览</span>
-                        </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
-                          <ThumbsUp className="h-4 w-4 mr-1" />
-                          <span>{post.likes} 点赞</span>
-                        </div>
-                        <div className="flex items-center text-sm text-muted-foreground">
                           <MessageSquare className="h-4 w-4 mr-1" />
-                          <span>{post.comments} 评论</span>
+                          <span>{post._count.comments} 评论</span>
                         </div>
                       </div>
                     )}
                   </CardContent>
+                  
                   <CardFooter className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/forum/edit/${post.id}`}>
