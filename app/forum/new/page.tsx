@@ -1,120 +1,182 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import React, { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Save, Rocket } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
-import ToastEditor, { ToastEditorRef } from '@/components/editor/ToastEditor';
-import { ArrowLeft, Save } from 'lucide-react';
-import { useUserStore } from '@/store';
+import { ToastAction } from "@/components/ui/toast";
+import VditorEditor, {
+  VditorEditorRef,
+} from "@/components/editor/VditorEditor";
+import { useUserStore } from "@/store";
 
-// 帖子分类选项
-const categories = [
-  { value: 'general', label: '综合讨论' },
-  { value: 'programming', label: '编程技术' },
-  { value: 'design', label: '设计创意' },
-  { value: 'productivity', label: '效率提升' },
-  { value: 'career', label: '职业发展' },
-];
+// 定义表单验证模式
+const formSchema = z.object({
+  title: z.string().min(1, { message: "请输入帖子标题" }),
+  tags: z.string().min(1, { message: "请输入帖子标签" }),
+  content: z.string().optional(),
+  status: z.enum(["draft", "published"]).default("published"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 export default function NewPostPage() {
   const router = useRouter();
-  const editorRef = useRef<ToastEditorRef>(null);
-  const { user, isLoggedIn } = useUserStore();
-  
-  // 表单状态
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    category: 'general',
-    tags: '',
-  });
-  
+  const editorRef = useRef<VditorEditorRef>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // 处理表单字段变化
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const contentRef = useRef(""); // 使用 ref 来存储内容
+  const { user } = useUserStore();
+
+  // 初始化表单
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: "",
+      tags: "",
+      content: "",
+      status: "published",
+    },
+  });
+
+  // 同步编辑器内容到 ref
+  const handleContentChange = (value: string) => {
+    contentRef.current = value;
+    form.setValue("content", value, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: false,
+    });
   };
-  
-  // 处理编辑器内容变化
-  const handleEditorChange = (value: string) => {
-    setFormData(prev => ({ ...prev, content: value }));
-  };
-  
-  // 处理表单提交
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+
+  // 保持编辑器内容
+  React.useEffect(() => {
+    if (editorRef.current && contentRef.current) {
+      const editor = editorRef.current;
+      editor.clear();
+      editor.getInstance().setValue(contentRef.current);
+    }
+  }, [form.formState.submitCount]); // 仅在表单提交后重新设置内容
+
+  // 保存草稿
+  const saveDraft = async () => {
+    // 验证必填字段
+    const result = await form.trigger(["title", "tags"]);
+    if (!result) {
+      return;
+    }
     
-    try {
-      // 获取最新的编辑器内容
-      const content = editorRef.current?.getMarkdown() || formData.content;
-      
-      // 验证表单
-      if (!formData.title.trim()) {
-        throw new Error('请输入帖子标题');
-      }
-      
-      if (!content.trim()) {
-        throw new Error('请输入帖子内容');
-      }
-      
-      // 准备帖子数据
-      const postData = {
-        ...formData,
-        content,
-        tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        authorId: user?.id || 'anonymous',
-        status: 'published',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // 在实际应用中，这里应该调用API保存帖子
-      console.log('发布帖子:', postData);
-      
-      // 模拟API调用延迟
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+    // 验证内容不能为空
+    if (!contentRef.current.trim()) {
       toast({
-        title: '帖子已发布',
-        description: `《${formData.title}》已成功发布。`,
+        title: "提示",
+        description: "请输入帖子内容",
+        variant: "default",
+        action: <ToastAction altText="close">关闭</ToastAction>,
       });
+      return;
+    }
+    
+    // 设置状态为草稿并提交
+    form.setValue("status", "draft");
+    form.handleSubmit(onSubmit)();
+  };
+
+  // 处理表单提交
+  const onSubmit = async (values: FormValues) => {
+    try {
+      setIsLoading(true);
       
-      // 发布成功后返回帖子列表页
-      router.push('/forum');
-    } catch (error) {
-      console.error('发布帖子失败:', error);
+      // 验证内容不能为空
+      if (!contentRef.current.trim()) {
+        toast({
+          title: "提示",
+          description: "请输入帖子内容",
+          variant: "default",
+          action: <ToastAction altText="close">关闭</ToastAction>,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      const status = values.status;
+
+      // 准备提交的数据
+      const postData = {
+        ...values,
+        tags: values.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        content: contentRef.current,
+      };
+
+      // 发送请求创建帖子
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(postData),
+      });
+
+      if (!response.ok) {
+        let errorMessage;
+        try {
+          const error = await response.json();
+          errorMessage = error.error || (status === "draft" ? "保存草稿失败" : "发布帖子失败");
+        } catch (e) {
+          // JSON解析错误
+          console.error("响应解析错误:", e, "状态码:", response.status);
+          errorMessage = `${status === "draft" ? "保存草稿" : "发布帖子"}失败: 服务器响应无效`;
+        }
+        throw new Error(errorMessage);
+      }
+
       toast({
-        title: '发布失败',
-        description: error instanceof Error ? error.message : '发布帖子时出现错误，请稍后重试。',
-        variant: 'destructive',
+        title: "成功！",
+        description: status === "draft"
+          ? `《${values.title}》已保存为草稿。`
+          : `《${values.title}》已成功发布。`,
+        action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
+      });
+
+      // 根据状态跳转到不同页面
+      router.push(status === "draft" ? "/drafts" : "/posts");
+    } catch (error) {
+      console.error("创建帖子出错:", error);
+      toast({
+        title: "失败！",
+        description:
+          error instanceof Error ? error.message : "创建帖子失败，请重试",
+        variant: "default",
+        action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
       });
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // 如果用户未登录，显示提示信息
-  if (!isLoggedIn) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="text-center py-12">
-          <h1 className="text-2xl font-bold mb-4">需要登录</h1>
-          <p className="text-muted-foreground mb-6">您需要登录后才能发布帖子</p>
-          <Button onClick={() => router.push('/auth/login?callbackUrl=/forum/new')}>
-            去登录
-          </Button>
-        </div>
-      </div>
-    );
-  }
-  
+
   return (
     <div className="container mx-auto py-8 px-4">
       <div className="mb-6 flex items-center">
@@ -122,96 +184,82 @@ export default function NewPostPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           返回
         </Button>
-        <h1 className="text-2xl font-bold">发布新帖子</h1>
+        <h1 className="text-2xl font-bold">创建新帖子</h1>
       </div>
-      
-      <form onSubmit={handleSubmit}>
-        <Card>
-          <CardHeader>
-            <CardTitle>帖子信息</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">标题</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => handleChange('title', e.target.value)}
-                placeholder="请输入帖子标题"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="category">分类</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value: string) => handleChange('category', value)}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue placeholder="选择分类" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.value} value={category.value}>
-                      {category.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="tags">标签</Label>
-              <Input
-                id="tags"
-                value={formData.tags}
-                onChange={(e) => handleChange('tags', e.target.value)}
-                placeholder="输入标签，用逗号分隔"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="content">内容</Label>
-              <div className="border rounded-md">
-                <ToastEditor
-                  ref={editorRef}
-                  height="500px"
-                  initialValue=""
-                  placeholder="请输入..."
-                  onChange={handleEditorChange}
+
+      <Card>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardHeader>
+              <CardTitle>帖子信息</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>标题</FormLabel>
+                      <FormControl>
+                        <Input placeholder="请输入帖子标题" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-              disabled={isLoading}
-            >
-              取消
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <span className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  发布中...
-                </span>
-              ) : (
-                <span className="flex items-center">
-                  <Save className="mr-2 h-4 w-4" />
-                  发布帖子
-                </span>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
+
+              <div className="space-y-2">
+                <FormField
+                  control={form.control}
+                  name="tags"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>标签</FormLabel>
+                      <FormControl>
+                        <Input placeholder="输入标签，用逗号分隔" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="content">内容</Label>
+                <div className="border rounded-md">
+                  <VditorEditor
+                    ref={editorRef}
+                    height={500}
+                    placeholder="请输入内容..."
+                    onChange={handleContentChange}
+                  />
+                </div>
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex justify-end space-x-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                disabled={isLoading}
+                onClick={saveDraft}
+              >
+                <Save className="mr-1 h-4 w-4" />
+                {isLoading ? "保存中..." : "保存草稿"}
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+              >
+                <Rocket className="mr-1 h-4 w-4" />
+                {isLoading ? "发布中..." : "发布帖子"}
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
     </div>
   );
-} 
+}
