@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest) {
   
   // 如果是公开路由，直接放行
   if (isPublicRoute) {
+    console.log(`[中间件] 公开路由: ${pathname}, 放行`);
     return NextResponse.next()
   }
   
@@ -23,10 +24,12 @@ export async function middleware(request: NextRequest) {
   
   // 如果用户已登录，放行
   if (token) {
+    console.log(`[中间件] 用户已登录, 路径: ${pathname}, 放行`);
     return NextResponse.next()
   }
   
   // 用户未登录且尝试访问受保护的路由，重定向到登录页面
+  console.log(`[中间件] 用户未登录, 路径: ${pathname}, 重定向到登录页`);
   const loginUrl = new URL('/auth/login', request.url)
   // 保存原始URL，以便登录后可以重定向回来
   loginUrl.searchParams.set('callbackUrl', encodeURI(request.url))

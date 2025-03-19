@@ -161,8 +161,8 @@ export default function NewPostPage() {
         action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
       });
 
-      // 根据状态跳转到不同页面
-      router.push(status === "draft" ? "/drafts" : "/posts");
+      // 根据状态跳转到不同页面和标签
+      router.push(`/user/posts?tab=${status}`);
     } catch (error) {
       console.error("创建帖子出错:", error);
       toast({

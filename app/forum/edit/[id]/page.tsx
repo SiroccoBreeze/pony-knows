@@ -39,12 +39,17 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 // 定义帖子类型
+interface PostTag {
+  tag: Tag;
+}
+
 interface Post {
   id: string;
   title: string;
   content: string;
   status: "draft" | "published";
   tags: Tag[];
+  postTags?: PostTag[];
   createdAt: string;
   updatedAt: string;
 }
@@ -78,7 +83,12 @@ export default function PostEditPage({ params }: PostEditPageProps) {
           throw new Error("获取帖子失败");
         }
         const data = await response.json();
-        setPost(data);
+        // 将postTags转换为tags格式
+        const formattedData = {
+          ...data,
+          tags: data.postTags ? data.postTags.map((pt: PostTag) => pt.tag) : []
+        };
+        setPost(formattedData);
       } catch (error) {
         console.error("获取帖子出错:", error);
         toast({
@@ -109,12 +119,23 @@ export default function PostEditPage({ params }: PostEditPageProps) {
   React.useEffect(() => {
     if (post) {
       form.reset({
-      title: post.title,
+        title: post.title,
         tags: post.tags?.map((tag) => tag.name).join(", ") || "",
-      content: post.content,
-      status: post.status,
+        content: post.content,
+        status: post.status,
       });
       contentRef.current = post.content;
+      
+      // 延迟设置编辑器内容，确保编辑器已初始化
+      setTimeout(() => {
+        if (editorRef.current) {
+          try {
+            editorRef.current.getInstance().setValue(post.content);
+          } catch (e) {
+            console.error("设置编辑器内容失败:", e);
+          }
+        }
+      }, 500);
     }
   }, [post, form]);
 
@@ -161,6 +182,30 @@ export default function PostEditPage({ params }: PostEditPageProps) {
     form.handleSubmit(onSubmit)();
   };
 
+  // 发布帖子
+  const publishPost = async () => {
+    // 验证必填字段
+    const result = await form.trigger(["title", "tags"]);
+    if (!result) {
+      return;
+    }
+    
+    // 验证内容不能为空
+    if (!contentRef.current.trim()) {
+      toast({
+        title: "提示",
+        description: "请输入帖子内容",
+        variant: "default",
+        action: <ToastAction altText="close">关闭</ToastAction>,
+      });
+      return;
+    }
+    
+    // 设置状态为发布并提交
+    form.setValue("status", "published");
+    form.handleSubmit(onSubmit)();
+  };
+
   // 处理表单提交
   const onSubmit = async (values: FormValues) => {
     try {
@@ -202,32 +247,26 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       });
 
       console.log("服务器响应状态:", response.status);
-      console.log("服务器响应头:", Object.fromEntries(response.headers.entries()));
-
-      let data;
-      try {
-        const responseText = await response.text();
-        console.log("服务器响应文本:", responseText);
-        data = responseText ? JSON.parse(responseText) : null;
-      } catch (error) {
-        console.error("解析响应失败:", error);
-        throw new Error("服务器响应格式错误");
-      }
 
       if (!response.ok) {
-        throw new Error(data?.error || (status === "draft" ? "保存草稿失败" : "更新帖子失败"));
+        const errorText = await response.text();
+        console.error("服务器错误响应:", errorText);
+        throw new Error(status === "draft" ? "保存草稿失败" : "更新帖子失败");
       }
+
+      // 成功响应
+      await response.json(); // 读取响应体但不需要使用
 
       toast({
         title: "成功！",
         description: status === "draft"
           ? `《${values.title}》已保存为草稿。`
-          : `《${values.title}》已成功更新。`,
-        action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
+          : `《${values.title}》已成功发布。`,
+        action: <ToastAction altText="close">关闭</ToastAction>,
       });
 
-      // 根据状态跳转到不同页面
-      router.push(status === "draft" ? "/drafts" : "/posts");
+      // 根据状态跳转到不同页面和标签
+      router.push(`/user/posts?tab=${status}`);
     } catch (error) {
       console.error("更新帖子出错:", error);
       toast({
@@ -235,7 +274,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
         description:
           error instanceof Error ? error.message : "更新帖子失败，请重试",
         variant: "destructive",
-        action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
+        action: <ToastAction altText="close">关闭</ToastAction>,
       });
     } finally {
       setIsLoading(false);
@@ -327,7 +366,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
                     height={500}
                     placeholder="请输入内容..."
                     onChange={handleContentChange}
-                    initialValue={post.content}
+                    initialValue={post.content || ""}
                   />
                 </div>
               </div>
@@ -344,8 +383,9 @@ export default function PostEditPage({ params }: PostEditPageProps) {
                 {isLoading ? "保存中..." : "保存草稿"}
               </Button>
               <Button 
-                type="submit" 
+                type="button" 
                 disabled={isLoading}
+                onClick={publishPost}
               >
                 <Rocket className="mr-1 h-4 w-4" />
                 {isLoading ? "发布中..." : "发布帖子"}

@@ -100,8 +100,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const authorId = searchParams.get('authorId');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const skipPagination = searchParams.get('skipPagination') === 'true';
 
-    console.log("API查询参数:", { status, authorId });
+    console.log("API查询参数:", { status, authorId, page, limit, skipPagination });
     
     // 检查authorId参数格式
     if (authorId) {
@@ -131,6 +134,13 @@ export async function GET(request: Request) {
       console.log("帖子作者ID示例:", postAuthors);
     }
 
+    // 计算总数
+    const total = await prisma.post.count({ where });
+    
+    // 分页参数
+    const skip = skipPagination ? undefined : (page - 1) * limit;
+    const take = skipPagination ? undefined : limit;
+
     // 获取帖子列表
     const posts = await prisma.post.findMany({
       where,
@@ -146,14 +156,21 @@ export async function GET(request: Request) {
             name: true,
             email: true,
           }
+        },
+        _count: {
+          select: {
+            comments: true
+          }
         }
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      skip,
+      take
     });
     
-    console.log(`查询到 ${posts.length} 条帖子记录`);
+    console.log(`查询到 ${posts.length} 条帖子记录，总共 ${total} 条`);
     
     // 如果没有帖子但有authorId，尝试检查用户是否存在
     if (posts.length === 0 && authorId) {
@@ -164,7 +181,20 @@ export async function GET(request: Request) {
       console.log("用户查询结果:", user);
     }
 
-    return NextResponse.json(posts);
+    // 返回分页数据和总数
+    if (skipPagination) {
+      // 不分页，直接返回所有数据
+      return NextResponse.json(posts);
+    } else {
+      // 返回分页格式
+      return NextResponse.json({
+        posts,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      });
+    }
   } catch (error) {
     console.error("获取帖子列表失败:", error);
     return NextResponse.json(

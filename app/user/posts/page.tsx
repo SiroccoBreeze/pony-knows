@@ -9,6 +9,8 @@ import { Edit, Trash2, Eye, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import { Pagination } from "@/components/ui/pagination";
 
 // 定义帖子类型
 interface Post {
@@ -48,39 +50,108 @@ export default function PostsPage() {
   const [activeTab, setActiveTab] = useState("published");
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const { data: session } = useSession() as { data: ExtendedSession | null };
+  const [currentPage, setCurrentPage] = useState(1);
+  const [postsPerPage, setPostsPerPage] = useState(10);
+  const [totalPosts, setTotalPosts] = useState(0);
+  const { data: session, status } = useSession() as { data: ExtendedSession | null; status: string };
   const router = useRouter();
 
+  // 从URL获取tab参数和页码
   useEffect(() => {
-    if (!session?.user?.id) {
-      router.push("/login");
-      return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const tab = searchParams.get('tab');
+    const page = searchParams.get('page');
+    
+    if (tab && ['published', 'draft', 'all'].includes(tab)) {
+      setActiveTab(tab);
     }
+    if (page) {
+      setCurrentPage(parseInt(page));
+    }
+  }, []);
 
-    const fetchPosts = async () => {
-      try {
-        const userId = session.user.id;
-        const response = await fetch(`/api/posts?authorId=${userId}`);
-        if (!response.ok) {
-          throw new Error("获取帖子失败");
-        }
-        const data = await response.json();
-        setPosts(data);
-      } catch (error) {
-        console.error("获取帖子失败:", error);
-      } finally {
-        setLoading(false);
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkSession = async () => {
+      // 等待session加载完成
+      if (status === "loading") {
+        console.log("Session加载中...");
+        return;
       }
+
+      console.log("Session状态:", status, "用户ID:", session?.user?.id);
+
+      // 只有在明确未认证时才重定向
+      if (status === "unauthenticated" && isMounted) {
+        console.log("未认证，重定向到登录页");
+        router.push("/auth/login");
+        return;
+      }
+
+      // 如果session已加载但用户ID不存在，记录问题但不重定向
+      if (!session?.user?.id) {
+        console.log("用户ID不存在，但session状态为:", status);
+        if (isMounted) {
+          setLoading(false);
+        }
+        return;
+      }
+
+      const fetchPosts = async () => {
+        try {
+          const userId = session.user!.id;
+          console.log("准备获取用户帖子，用户ID:", userId);
+          
+          // 根据activeTab设置status参数
+          const status = activeTab === 'all' ? '' : activeTab;
+          const response = await fetch(`/api/posts?authorId=${userId}&status=${status}&page=${currentPage}&limit=${postsPerPage}`);
+          console.log("API响应状态:", response.status);
+          
+          if (!response.ok) {
+            throw new Error('获取帖子列表失败');
+          }
+          
+          const data = await response.json();
+          console.log(`获取到 ${data.posts.length} 篇帖子`);
+          if (isMounted) {
+            setPosts(data.posts);
+            setTotalPosts(data.total);
+          }
+        } catch (error) {
+          console.error('获取帖子列表失败:', error);
+          toast.error('获取帖子列表失败，请稍后再试');
+          if (isMounted) {
+            setPosts([]);
+            setTotalPosts(0);
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchPosts();
     };
 
-    fetchPosts();
-  }, [session, router]);
+    checkSession();
 
-  // 根据状态筛选帖子
-  const filteredPosts = posts.filter(post => 
-    activeTab === "all" || post.status === activeTab
-  );
-  
+    return () => {
+      isMounted = false;
+    };
+  }, [session, status, router, currentPage, activeTab]);
+
+  // 处理标签变化
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setCurrentPage(1); // 切换标签时重置页码
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.set('tab', tab);
+    searchParams.set('page', '1');
+    router.push(`/user/posts?${searchParams.toString()}`);
+  };
+
   // 格式化日期
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -111,12 +182,25 @@ export default function PostsPage() {
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-12">加载中...</div>;
+  const handlePageSizeChange = (pageSize: number) => {
+    setPostsPerPage(pageSize);
+    setCurrentPage(1);
+  };
+
+  // 如果正在加载session或帖子数据，显示加载状态
+  if (status === "loading" || loading) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold mb-4">加载中...</h1>
+          <p className="text-muted-foreground">正在获取帖子数据</p>
+        </div>
+      </div>
+    );
   }
   
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-8 px-4 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">帖子管理</h1>
         <Button>
@@ -126,7 +210,7 @@ export default function PostsPage() {
         </Button>
       </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="published">已发布</TabsTrigger>
           <TabsTrigger value="draft">草稿</TabsTrigger>
@@ -134,13 +218,13 @@ export default function PostsPage() {
         </TabsList>
         
         <TabsContent value={activeTab} className="mt-6">
-          {filteredPosts.length === 0 ? (
+          {posts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">暂无{activeTab === "published" ? "已发布" : activeTab === "draft" ? "草稿" : ""}帖子</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredPosts.map(post => (
+              {posts.map(post => (
                 <Card key={post.id}>
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
@@ -161,11 +245,19 @@ export default function PostsPage() {
                       {post.content.substring(0, 200)}...
                     </p>
                     
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {post.postTags.map(({ tag }) => (
+                        <Badge key={tag.id} variant="outline">
+                          {tag.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    
                     {post.status === "published" && (
                       <div className="flex gap-4 mt-4">
                         <div className="flex items-center text-sm text-muted-foreground">
                           <MessageSquare className="h-4 w-4 mr-1" />
-                          <span>{post._count.comments} 评论</span>
+                          <span>{post._count?.comments || 0} 评论</span>
                         </div>
                       </div>
                     )}
@@ -193,6 +285,17 @@ export default function PostsPage() {
               ))}
             </div>
           )}
+
+          {/* 分页控件 */}
+          <Pagination
+            current={currentPage}
+            total={totalPosts}
+            pageSize={postsPerPage}
+            onChange={(page) => setCurrentPage(page)}
+            showSizeChanger
+            showTotal={(total) => `共 ${total} 条`}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </TabsContent>
       </Tabs>
     </div>

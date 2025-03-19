@@ -18,10 +18,10 @@ interface ExtendedSession {
 // 获取单个帖子
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: Promise<string> } }
 ) {
   try {
-    const postId = params.id;
+    const postId = await params.id;
 
     const post = await prisma.post.findUnique({
       where: { id: postId },
@@ -68,7 +68,7 @@ export async function GET(
 // 更新帖子
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: Promise<string> } }
 ) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
@@ -79,7 +79,7 @@ export async function PUT(
       );
     }
 
-    const postId = params.id;
+    const postId = await params.id;
     const body = await request.json();
     const { title, content, tags, status } = body;
 
@@ -176,7 +176,7 @@ export async function PUT(
 // 删除帖子
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: Promise<string> } }
 ) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
@@ -187,7 +187,7 @@ export async function DELETE(
       );
     }
 
-    const postId = params.id;
+    const postId = await params.id;
 
     // 检查帖子是否存在且属于当前用户
     const existingPost = await prisma.post.findUnique({
