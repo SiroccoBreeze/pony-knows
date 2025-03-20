@@ -106,36 +106,36 @@ export async function GET(request: Request) {
 
     console.log("API查询参数:", { status, authorId, page, limit, skipPagination });
     
-    // 检查authorId参数格式
-    if (authorId) {
-      console.log(`authorId类型: ${typeof authorId}, 长度: ${authorId.length}, 值: ${authorId}`);
+    // 检查必要的参数
+    if (!authorId) {
+      return NextResponse.json(
+        { error: "必须提供作者ID" },
+        { status: 400 }
+      );
     }
 
     // 构建查询条件
-    const where: Prisma.PostWhereInput = {};
+    const where: Prisma.PostWhereInput = {
+      authorId: authorId
+    };
+    
     if (status) {
       where.status = status;
-    }
-    if (authorId) {
-      where.authorId = authorId;
-      
-      // 查看数据库中是否有这个ID的用户
-      const user = await prisma.user.findUnique({
-        where: { id: authorId },
-        select: { id: true, name: true, email: true }
-      });
-      console.log("用户查询结果:", user);
-      
-      // 直接检查数据库中的帖子作者ID（不依赖前端传入的authorId）
-      const postAuthors = await prisma.post.findMany({
-        select: { id: true, title: true, authorId: true },
-        take: 5 // 只获取前5条记录用于调试
-      });
-      console.log("帖子作者ID示例:", postAuthors);
     }
 
     // 计算总数
     const total = await prisma.post.count({ where });
+    
+    // 如果总数为0，直接返回空结果，避免额外查询
+    if (total === 0) {
+      return NextResponse.json({
+        posts: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0
+      });
+    }
     
     // 分页参数
     const skip = skipPagination ? undefined : (page - 1) * limit;
@@ -171,15 +171,6 @@ export async function GET(request: Request) {
     });
     
     console.log(`查询到 ${posts.length} 条帖子记录，总共 ${total} 条`);
-    
-    // 如果没有帖子但有authorId，尝试检查用户是否存在
-    if (posts.length === 0 && authorId) {
-      const user = await prisma.user.findUnique({
-        where: { id: authorId },
-        select: { id: true, name: true }
-      });
-      console.log("用户查询结果:", user);
-    }
 
     // 返回分页数据和总数
     if (skipPagination) {

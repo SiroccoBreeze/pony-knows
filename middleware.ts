@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 // 公开路由列表（不需要登录即可访问）
-const publicRoutes = ['/', '/auth/login', '/auth/register', '/api', '/_next', '/favicon.ico']
+const publicRoutes = ['/', '/auth/login', '/auth/register', '/api', '/_next', '/favicon.ico', '/images']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -20,12 +20,24 @@ export async function middleware(request: NextRequest) {
   }
   
   // 获取会话token
-  const token = await getToken({ req: request })
+  const token = await getToken({ 
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET 
+  })
+  
+  console.log(`[中间件] 路径: ${pathname}, Token:`, token ? '存在' : '不存在');
   
   // 如果用户已登录，放行
   if (token) {
-    console.log(`[中间件] 用户已登录, 路径: ${pathname}, 放行`);
-    return NextResponse.next()
+    console.log(`[中间件] 用户已登录, 路径: ${pathname}, 用户ID: ${token.sub}, 放行`);
+    
+    // 创建一个新的响应对象
+    const response = NextResponse.next()
+    
+    // 为了确保cookie能被客户端读取，在响应中添加一些相关头部
+    response.headers.set('X-NextAuth-Token-Found', 'true')
+    
+    return response
   }
   
   // 用户未登录且尝试访问受保护的路由，重定向到登录页面

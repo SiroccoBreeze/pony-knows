@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,7 +53,8 @@ export default function PostsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [postsPerPage, setPostsPerPage] = useState(10);
   const [totalPosts, setTotalPosts] = useState(0);
-  const { data: session, status } = useSession() as { data: ExtendedSession | null; status: string };
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
+  const { data: session, status, update: updateSession } = useSession() as { data: ExtendedSession | null; status: string; update: () => Promise<ExtendedSession | null> };
   const router = useRouter();
 
   // 从URL获取tab参数和页码
@@ -70,77 +71,94 @@ export default function PostsPage() {
     }
   }, []);
 
+  // 首次加载时手动更新session
   useEffect(() => {
-    let isMounted = true;
-
-    const checkSession = async () => {
-      // 等待session加载完成
-      if (status === "loading") {
-        console.log("Session加载中...");
-        return;
-      }
-
-      console.log("Session状态:", status, "用户ID:", session?.user?.id);
-
-      // 只有在明确未认证时才重定向
-      if (status === "unauthenticated" && isMounted) {
-        console.log("未认证，重定向到登录页");
-        router.push("/auth/login");
-        return;
-      }
-
-      // 如果session已加载但用户ID不存在，记录问题但不重定向
-      if (!session?.user?.id) {
-        console.log("用户ID不存在，但session状态为:", status);
-        if (isMounted) {
-          setLoading(false);
+    const refreshSession = async () => {
+      try {
+        if (status === "loading") return;
+        
+        console.log("手动获取session...");
+        // 直接从服务器获取session，绕过缓存
+        const freshSession = await fetch('/api/auth/session');
+        const sessionData = await freshSession.json();
+        console.log("手动获取的session数据:", sessionData);
+        
+        if (sessionData.user && status !== "authenticated") {
+          // 如果服务器返回了用户信息，但客户端session不存在，则更新session
+          console.log("服务器已认证用户，正在更新本地session状态");
+          await updateSession();
         }
-        return;
+        
+        setIsSessionChecked(true);
+      } catch (error) {
+        console.error("刷新session失败:", error);
+        setIsSessionChecked(true);
       }
-
-      const fetchPosts = async () => {
-        try {
-          const userId = session.user!.id;
-          console.log("准备获取用户帖子，用户ID:", userId);
-          
-          // 根据activeTab设置status参数
-          const status = activeTab === 'all' ? '' : activeTab;
-          const response = await fetch(`/api/posts?authorId=${userId}&status=${status}&page=${currentPage}&limit=${postsPerPage}`);
-          console.log("API响应状态:", response.status);
-          
-          if (!response.ok) {
-            throw new Error('获取帖子列表失败');
-          }
-          
-          const data = await response.json();
-          console.log(`获取到 ${data.posts.length} 篇帖子`);
-          if (isMounted) {
-            setPosts(data.posts);
-            setTotalPosts(data.total);
-          }
-        } catch (error) {
-          console.error('获取帖子列表失败:', error);
-          toast.error('获取帖子列表失败，请稍后再试');
-          if (isMounted) {
-            setPosts([]);
-            setTotalPosts(0);
-          }
-        } finally {
-          if (isMounted) {
-            setLoading(false);
-          }
-        }
-      };
-
-      fetchPosts();
     };
 
-    checkSession();
+    refreshSession();
+  }, [status, updateSession]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [session, status, router, currentPage, activeTab]);
+  // 获取帖子数据
+  const fetchPosts = useCallback(async () => {
+    if (!session?.user?.id) return;
+    
+    try {
+      const userId = session.user.id;
+      console.log("准备获取用户帖子，用户ID:", userId);
+      
+      // 根据activeTab设置status参数
+      const status = activeTab === 'all' ? '' : activeTab;
+      const response = await fetch(`/api/posts?authorId=${userId}&status=${status}&page=${currentPage}&limit=${postsPerPage}`);
+      console.log("API响应状态:", response.status);
+      
+      if (!response.ok) {
+        throw new Error('获取帖子列表失败');
+      }
+      
+      const data = await response.json();
+      console.log(`获取到 ${data.posts.length} 篇帖子`);
+      setPosts(data.posts);
+      setTotalPosts(data.total);
+    } catch (error) {
+      console.error('获取帖子列表失败:', error);
+      toast.error('获取帖子列表失败，请稍后再试');
+      setPosts([]);
+      setTotalPosts(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [session, activeTab, currentPage, postsPerPage]);
+
+  // 只有在session已检查且已认证时才获取帖子数据
+  useEffect(() => {
+    if (!isSessionChecked) return;
+    
+    if (status === "loading") {
+      console.log("Session加载中...");
+      return;
+    }
+
+    console.log("Session状态:", status, "用户ID:", session?.user?.id, "完整Session:", session);
+
+    // 只有在明确未认证时才重定向
+    if (status === "unauthenticated") {
+      console.log("未认证，重定向到登录页");
+      router.replace("/auth/login");
+      return;
+    }
+
+    // 如果session已加载但用户ID不存在，记录问题但不重定向
+    if (!session?.user?.id) {
+      console.log("用户ID不存在，但session状态为:", status);
+      setLoading(false);
+      return;
+    }
+
+    // 如果session和用户ID都存在，获取帖子
+    console.log("用户已认证，开始加载帖子");
+    fetchPosts();
+  }, [status, isSessionChecked, session, router, fetchPosts]);
 
   // 处理标签变化
   const handleTabChange = (tab: string) => {

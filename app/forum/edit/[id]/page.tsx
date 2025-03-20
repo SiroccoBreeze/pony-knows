@@ -126,16 +126,32 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       });
       contentRef.current = post.content;
       
-      // 延迟设置编辑器内容，确保编辑器已初始化
-      setTimeout(() => {
-        if (editorRef.current) {
-          try {
-            editorRef.current.getInstance().setValue(post.content);
-          } catch (e) {
-            console.error("设置编辑器内容失败:", e);
-          }
+      // 等待编辑器初始化，然后设置内容
+      const setEditorContent = () => {
+        if (!editorRef.current) {
+          console.log("编辑器引用尚未创建，延迟尝试...");
+          setTimeout(setEditorContent, 500);
+          return;
         }
-      }, 500);
+        
+        try {
+          // 检查编辑器是否已准备好
+          if (editorRef.current.isReady()) {
+            console.log("编辑器已准备好，设置内容");
+            const editor = editorRef.current.getInstance();
+            editor.setValue(post.content);
+          } else {
+            console.log("编辑器尚未准备好，延迟尝试...");
+            setTimeout(setEditorContent, 500);
+          }
+        } catch (e) {
+          console.error("检查编辑器状态或设置内容时出错:", e);
+          setTimeout(setEditorContent, 1000);
+        }
+      };
+      
+      // 开始尝试设置编辑器内容
+      setEditorContent();
     }
   }, [post, form]);
 

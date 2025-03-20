@@ -19,6 +19,7 @@ export interface VditorEditorRef {
   focus: () => void;
   blur: () => void;
   getInstance: () => Vditor;
+  isReady: () => boolean;
 }
 
 const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
@@ -26,6 +27,7 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
     const editorRef = useRef<Vditor | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [domReady, setDomReady] = useState(false);
+    const [editorReady, setEditorReady] = useState(false);
     const [currentValue, setCurrentValue] = useState(initialValue);
 
     // 检查DOM是否已加载
@@ -38,6 +40,7 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
       // 确保DOM已加载且容器元素存在
       if (domReady && containerRef.current && !editorRef.current) {
         try {
+          console.log("初始化Vditor编辑器...");
           const vditor = new Vditor(containerRef.current, {
             height,
             mode: 'wysiwyg', // 默认使用所见即所得模式
@@ -83,8 +86,14 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
               }
             },
             after: () => {
+              console.log("Vditor编辑器初始化完成");
+              setEditorReady(true);
               if (currentValue) {
-                vditor.setValue(currentValue);
+                try {
+                  vditor.setValue(currentValue);
+                } catch (e) {
+                  console.error("初始化后设置编辑器内容失败:", e);
+                }
               }
             },
           });
@@ -100,6 +109,7 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
               const vditor = editorRef.current;
               if (vditor && typeof vditor.destroy === 'function') {
                 vditor.destroy?.();
+                setEditorReady(false);
               }
             } catch (error) {
               console.error('销毁编辑器时出错:', error);
@@ -113,30 +123,67 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
 
     // 监听 initialValue 的变化
     useEffect(() => {
-      if (editorRef.current && initialValue !== currentValue) {
-        editorRef.current.setValue(initialValue);
-        setCurrentValue(initialValue);
+      if (editorReady && editorRef.current && initialValue !== currentValue) {
+        try {
+          editorRef.current.setValue(initialValue);
+          setCurrentValue(initialValue);
+        } catch (e) {
+          console.error("更新编辑器内容失败:", e);
+        }
       }
-    }, [initialValue]);
+    }, [initialValue, editorReady]);
 
     // 暴露编辑器实例和方法给父组件
     useImperativeHandle(ref, () => ({
-      getValue: () => editorRef.current?.getValue() || '',
-      getHTML: () => editorRef.current?.getHTML() || '',
-      clear: () => {
-        if (editorRef.current) {
-          editorRef.current.setValue('');
-          setCurrentValue('');
+      getValue: () => {
+        if (!editorRef.current) return '';
+        try {
+          return editorRef.current.getValue() || '';
+        } catch (e) {
+          console.error("获取编辑器内容失败:", e);
+          return '';
         }
       },
-      focus: () => editorRef.current?.focus(),
-      blur: () => editorRef.current?.blur(),
+      getHTML: () => {
+        if (!editorRef.current) return '';
+        try {
+          return editorRef.current.getHTML() || '';
+        } catch (e) {
+          console.error("获取编辑器HTML失败:", e);
+          return '';
+        }
+      },
+      clear: () => {
+        if (editorRef.current) {
+          try {
+            editorRef.current.setValue('');
+            setCurrentValue('');
+          } catch (e) {
+            console.error("清除编辑器内容失败:", e);
+          }
+        }
+      },
+      focus: () => {
+        try {
+          editorRef.current?.focus();
+        } catch (e) {
+          console.error("聚焦编辑器失败:", e);
+        }
+      },
+      blur: () => {
+        try {
+          editorRef.current?.blur();
+        } catch (e) {
+          console.error("取消聚焦编辑器失败:", e);
+        }
+      },
       getInstance: () => {
         if (!editorRef.current) {
           throw new Error('编辑器实例未初始化');
         }
         return editorRef.current;
       },
+      isReady: () => editorReady,
     }));
 
     return <div ref={containerRef} className="vditor-container" />;

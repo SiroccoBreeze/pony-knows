@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { signIn, signOut, useSession } from "next-auth/react";
-import { SessionProvider } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from '@/store'; // 导入Zustand状态
 
@@ -11,6 +10,14 @@ export interface User {
   id: string;
   name?: string;
   email: string;
+}
+
+// 扩展 NextAuth 用户类型
+interface ExtendedUser {
+  id?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
 }
 
 // 注册数据类型
@@ -48,17 +55,22 @@ function AuthProviderContent({ children }: { children: React.ReactNode }) {
 
   // 当会话状态变化时更新Zustand状态
   useEffect(() => {
+    console.log("AuthProvider - Session状态:", status, "用户:", session?.user);
+    
     if (status === "authenticated" && session?.user) {
+      const sessionUser = session.user as ExtendedUser;
       // 将next-auth用户数据转换为Zustand用户数据
       const zustandUser = {
-        id: session.user.email || 'user-id', // 使用email作为id
-        name: session.user.name || '',
-        email: session.user.email || '',
+        id: sessionUser.id || sessionUser.email || 'user-id', // 优先使用user.id
+        name: sessionUser.name || '',
+        email: sessionUser.email || '',
       };
+      console.log("AuthProvider - 已登录，更新Zustand用户:", zustandUser);
       // 更新Zustand状态
       zustandLogin(zustandUser);
     } else if (status === "unauthenticated") {
       // 用户未认证，清除Zustand状态
+      console.log("AuthProvider - 未认证，清除Zustand状态");
       zustandLogout();
     }
     
@@ -153,13 +165,9 @@ function AuthProviderContent({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 认证提供者组件
+// 认证提供者组件（移除重复的SessionProvider）
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <SessionProvider>
-      <AuthProviderContent>{children}</AuthProviderContent>
-    </SessionProvider>
-  );
+  return <AuthProviderContent>{children}</AuthProviderContent>;
 }
 
 // 使用认证的自定义Hook
