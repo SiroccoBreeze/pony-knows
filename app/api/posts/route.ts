@@ -106,18 +106,13 @@ export async function GET(request: Request) {
 
     console.log("API查询参数:", { status, authorId, page, limit, skipPagination });
     
-    // 检查必要的参数
-    if (!authorId) {
-      return NextResponse.json(
-        { error: "必须提供作者ID" },
-        { status: 400 }
-      );
-    }
-
     // 构建查询条件
-    const where: Prisma.PostWhereInput = {
-      authorId: authorId
-    };
+    const where: Prisma.PostWhereInput = {};
+    
+    // 如果提供了作者ID，则按作者筛选
+    if (authorId) {
+      where.authorId = authorId;
+    }
     
     if (status) {
       where.status = status;

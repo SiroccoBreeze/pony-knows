@@ -1,9 +1,7 @@
-import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 // 扩展 Session 类型
 interface ExtendedSession {
@@ -18,11 +16,14 @@ interface ExtendedSession {
 // 获取单个帖子
 export async function GET(
   request: Request,
-  { params }: { params: { id: Promise<string> } }
+  { params }: { params: { id: string | Promise<string> } }
 ) {
   try {
-    const postId = await params.id;
+    // 使用类型断言处理params.id
+    const postId = typeof params.id === 'string' ? params.id : await params.id;
+    console.log("API 请求帖子ID:", postId);
 
+    // 查找帖子
     const post = await prisma.post.findUnique({
       where: { id: postId },
       include: {
@@ -46,6 +47,8 @@ export async function GET(
       },
     });
 
+    console.log("找到帖子:", post ? "是" : "否");
+    
     if (!post) {
       return NextResponse.json(
         { error: "帖子不存在" },
@@ -53,22 +56,29 @@ export async function GET(
       );
     }
 
+    // 暂时禁用浏览量更新功能，直接返回结果
     return NextResponse.json(post);
   } catch (error) {
     console.error("获取帖子失败:", error);
+    // 返回更详细的错误信息
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : null;
+    
     return NextResponse.json(
-      { error: "获取帖子失败，请稍后再试" },
+      { 
+        error: "获取帖子失败，请稍后再试", 
+        details: errorMessage,
+        stack: errorStack,
+      },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 // 更新帖子
 export async function PUT(
   request: Request,
-  { params }: { params: { id: Promise<string> } }
+  { params }: { params: { id: string | Promise<string> } }
 ) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
@@ -79,7 +89,8 @@ export async function PUT(
       );
     }
 
-    const postId = await params.id;
+    // 使用类型断言处理params.id
+    const postId = typeof params.id === 'string' ? params.id : await params.id;
     const body = await request.json();
     const { title, content, tags, status } = body;
 
@@ -168,15 +179,13 @@ export async function PUT(
       { error: "更新帖子失败，请稍后再试", details: errorMessage },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 // 删除帖子
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: Promise<string> } }
+  { params }: { params: { id: string | Promise<string> } }
 ) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
@@ -187,7 +196,8 @@ export async function DELETE(
       );
     }
 
-    const postId = await params.id;
+    // 使用类型断言处理params.id
+    const postId = typeof params.id === 'string' ? params.id : await params.id;
 
     // 检查帖子是否存在且属于当前用户
     const existingPost = await prisma.post.findUnique({
@@ -234,7 +244,5 @@ export async function DELETE(
       { error: "删除帖子失败，请稍后再试" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 } 

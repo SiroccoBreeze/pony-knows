@@ -4,6 +4,7 @@ import { ArrowBigUp, MessageSquare, Eye } from "lucide-react"
 import Link from "next/link"
 
 interface QuestionCardProps {
+  id: string
   title: string
   description: string
   tags: string[]
@@ -14,6 +15,7 @@ interface QuestionCardProps {
 }
 
 export function QuestionCard({
+  id,
   title,
   description,
   tags,
@@ -37,7 +39,7 @@ export function QuestionCard({
 
         {/* 问题内容 */}
         <div className="flex-1 min-w-0">
-          <Link href="#" className="block group-hover:text-primary transition-colors">
+          <Link href={`/forum/post/${id}`} className="block group-hover:text-primary transition-colors">
             <h3 className="text-lg font-semibold line-clamp-1">
               {title}
             </h3>

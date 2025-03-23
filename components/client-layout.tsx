@@ -14,7 +14,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       <main className={`flex-1 ${!isAuthPage ? 'pt-16' : ''}`}>
         {children}
       </main>
-      {!isAuthPage && <Footer />}
+      {/* {!isAuthPage && <Footer />} */}
     </>
   );
 } 

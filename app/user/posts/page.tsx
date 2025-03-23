@@ -289,7 +289,7 @@ export default function PostsPage() {
                       </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/forum/post/${post.id}`}>
+                      <Link href={`/forum/post/${post.id}?from=admin`}>
                         <Eye className="h-4 w-4 mr-1" />
                         查看
                       </Link>

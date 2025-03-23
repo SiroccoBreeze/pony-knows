@@ -78,6 +78,7 @@ model Post {
   tags      Tag[]       @relation("PostToTag") // 反向关系字段
   postTags  PostToTag[] // 明确反向关系字段
   status    String
+  views     Int         @default(0) // 浏览量计数
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 }
