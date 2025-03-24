@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState } from 'react';
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';
+import '@/app/vditor-override.css'; // 引入自定义的样式覆盖
 
 export interface VditorEditorProps {
   initialValue?: string;

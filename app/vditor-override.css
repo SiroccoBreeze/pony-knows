@@ -1,0 +1,95 @@
+/* Vditor 编辑器样式重写 */
+
+/* 重置Vditor的CSS计数器机制，使用浏览器原生的有序列表渲染 */
+.vditor-wysiwyg ol, .vditor-ir ol, .vditor-preview ol {
+  counter-reset: none !important;
+  display: block !important;
+  list-style-type: decimal !important;
+  padding-left: 2em !important;
+  margin-left: 0 !important;
+}
+
+/* 修复有序列表显示问题 - 所见即所得模式 */
+.vditor-wysiwyg ol {
+  list-style-type: decimal !important;
+  padding-left: 2em !important;
+  margin-left: 0 !important;
+}
+
+.vditor-wysiwyg ol li {
+  list-style-type: decimal !important;
+  display: list-item !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  position: relative !important;
+}
+
+/* 修复有序列表显示问题 - IR模式 */
+.vditor-ir ol {
+  list-style-type: decimal !important;
+  padding-left: 2em !important;
+  margin-left: 0 !important;
+}
+
+.vditor-ir ol li {
+  list-style-type: decimal !important;
+  display: list-item !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  position: relative !important;
+}
+
+/* 修复有序列表显示问题 - 预览模式 */
+.vditor-preview ol {
+  list-style-type: decimal !important;
+  padding-left: 2em !important;
+  margin-left: 0 !important;
+}
+
+.vditor-preview ol li {
+  list-style-type: decimal !important;
+  display: list-item !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+  position: relative !important;
+}
+
+/* 确保列表项正确显示数字序号 */
+.vditor ol[start] {
+  counter-reset: none !important;
+}
+
+/* 移除Vditor默认的列表项前伪元素 */
+.vditor ol > li::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* 强制重置可能影响列表显示的样式 */
+.vditor-reset ol {
+  list-style-type: decimal !important;
+}
+
+.vditor-reset ol li {
+  list-style: decimal !important;
+}
+
+/* 确保嵌套列表正确显示 */
+.vditor ol ol {
+  list-style-type: lower-alpha !important;
+}
+
+.vditor ol ol ol {
+  list-style-type: lower-roman !important;
+}
+
+/* 移动设备优化 */
+@media (max-width: 768px) {
+  .vditor ol {
+    padding-left: 1.5em !important;
+  }
+  
+  .vditor ol li {
+    margin-left: 0 !important;
+  }
+} 
