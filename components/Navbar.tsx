@@ -89,6 +89,12 @@ const Navbar = () => {
                 <NavigationMenuTrigger>服务</NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2">
+                    <ListItem href="/services" title="全部服务">
+                      查看我们提供的所有服务内容
+                    </ListItem>
+                    <ListItem href="/services/database" title="数据库表结构">
+                      查询和浏览数据库表结构信息
+                    </ListItem>
                     <ListItem href="/services/consulting" title="咨询服务">
                       专业的技术咨询解决方案
                     </ListItem>
