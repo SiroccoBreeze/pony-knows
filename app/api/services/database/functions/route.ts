@@ -44,6 +44,10 @@ export async function GET(request: Request) {
   const page = parseInt(searchParams.get("page") || "1");
   const pageSize = parseInt(searchParams.get("pageSize") || "20");
   const prefix = searchParams.get("prefix") || "";
+  // 添加搜索参数和不区分大小写选项
+  const searchTerm = searchParams.get("search") || "";
+  // 强制启用不区分大小写
+  const ignoreCase = true; // 强制为true，不再依赖URL参数
   
   let pool: sql.ConnectionPool | undefined;
   
@@ -59,16 +63,35 @@ export async function GET(request: Request) {
 
     // 创建数据库连接池
     pool = await new sql.ConnectionPool(sqlConfig).connect();
+    
+    // 构建LIKE查询条件
+    let whereClause = "(o.type = 'FN' OR o.type = 'IF' OR o.type = 'TF') AND o.is_ms_shipped = 0";
+    let searchValue = "";
+    
+    if (searchTerm) {
+      // 使用搜索词进行模糊匹配 - 总是小写
+      searchValue = `%${searchTerm.toLowerCase()}%`;
+      
+      // 始终使用不区分大小写的查询
+      whereClause += " AND (LOWER(o.name) LIKE @search OR o.name COLLATE SQL_Latin1_General_CP1_CI_AS LIKE @search)";
+    } else if (prefix) {
+      // 兼容旧的prefix参数
+      searchValue = `${prefix}%`;
+      whereClause += " AND o.name LIKE @search";
+    }
+
+    // 打印SQL语句和参数
+    console.log("函数搜索条件:", { searchTerm, ignoreCase, searchValue });
+    const countSql = `SELECT COUNT(*) AS total FROM sys.objects o WHERE ${whereClause}`;
+    console.log("函数统计SQL:", countSql);
 
     // 首先获取符合条件的总函数数量
     const countResult = await pool.request()
-      .input('prefix', sql.NVarChar, prefix + '%')
+      .input('search', sql.NVarChar, searchValue)
       .query(`
         SELECT COUNT(*) AS total
         FROM sys.objects o
-        WHERE (o.type = 'FN' OR o.type = 'IF' OR o.type = 'TF')
-        AND o.is_ms_shipped = 0
-        AND o.name LIKE @prefix
+        WHERE ${whereClause}
       `);
     
     const total = countResult.recordset[0].total;
@@ -77,7 +100,7 @@ export async function GET(request: Request) {
 
     // 分页查询所有函数，不包含定义内容以提高加载速度
     const functionsResult = await pool.request()
-      .input('prefix', sql.NVarChar, prefix + '%')
+      .input('search', sql.NVarChar, searchValue)
       .input('offset', sql.Int, offset)
       .input('pageSize', sql.Int, pageSize)
       .query(`
@@ -88,9 +111,7 @@ export async function GET(request: Request) {
         FROM 
           sys.objects o
         WHERE 
-          (o.type = 'FN' OR o.type = 'IF' OR o.type = 'TF')
-          AND o.is_ms_shipped = 0
-          AND o.name LIKE @prefix
+          ${whereClause}
         ORDER BY 
           o.name
         OFFSET @offset ROWS

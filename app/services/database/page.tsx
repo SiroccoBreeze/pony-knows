@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Loader2, Database, Table2, Key, FileText, 
-  AlertCircle, Code, Eye, BookOpen, Copy, Check
+  AlertCircle, Code, Eye, BookOpen, Copy, Check, Search
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Toaster } from "react-hot-toast";
@@ -41,6 +41,7 @@ interface DbTable {
   name: string;
   columns: DbColumn[];
   type: "table" | "view";
+  definition?: string; // 添加定义字段，用于存储视图创建脚本
 }
 
 // 存储过程/函数数据类型
@@ -60,16 +61,88 @@ interface PaginationInfo {
   totalPages: number;
 }
 
-// 修改代码高亮组件以支持主题
+// 修改代码高亮组件以支持主题和行号，并添加SQL变量识别
 const CodeHighlighter = ({ code }: { code: string }) => {
   const preRef = useRef<HTMLPreElement>(null);
+  const codeContainerRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {
-    if (preRef.current) {
-      Prism.highlightElement(preRef.current);
+    // 添加SQL变量规则
+    if (Prism.languages.sql) {
+      // 添加变量标记规则
+      Object.assign(Prism.languages.sql, {
+        'global-variable': {
+          pattern: /@@\w+/g,
+          greedy: true
+        },
+        'variable': {
+          pattern: /@\w+/g,
+          greedy: true
+        }
+      });
     }
-  }, [code]);
+
+    if (preRef.current) {
+      // 应用代码高亮
+      Prism.highlightElement(preRef.current);
+      
+      // 代码高亮完成后创建行号
+      setTimeout(() => {
+        if (preRef.current && codeContainerRef.current) {
+          // 清除之前可能存在的行号元素
+          const existingLineNumbers = codeContainerRef.current.querySelector('.line-numbers-container');
+          if (existingLineNumbers) {
+            existingLineNumbers.remove();
+          }
+          
+          // 计算代码行数
+          const lines = code.split('\n');
+          const lineCount = lines.length;
+          
+          // 创建行号容器
+          const lineNumbersContainer = document.createElement('div');
+          lineNumbersContainer.className = 'line-numbers-container';
+          lineNumbersContainer.style.position = 'absolute';
+          lineNumbersContainer.style.top = '0';
+          lineNumbersContainer.style.left = '0';
+          lineNumbersContainer.style.width = '2.5em';
+          lineNumbersContainer.style.height = '100%';
+          lineNumbersContainer.style.overflow = 'hidden';
+          lineNumbersContainer.style.borderRight = '1px solid #666';
+          lineNumbersContainer.style.backgroundColor = resolvedTheme === 'dark' ? '#1a1a1a' : '#f0f0f0';
+          lineNumbersContainer.style.paddingTop = '0.4em';
+          
+          // 创建行号内容
+          const lineNumbersContent = document.createElement('div');
+          lineNumbersContent.style.textAlign = 'right';
+          lineNumbersContent.style.paddingRight = '0.4em';
+          lineNumbersContent.style.color = '#888';
+          lineNumbersContent.style.fontSize = '0.85em';
+          lineNumbersContent.style.lineHeight = '1.4';
+          
+          // 生成所有行号
+          for (let i = 1; i <= lineCount; i++) {
+            const lineNumber = document.createElement('div');
+            lineNumber.textContent = i.toString();
+            lineNumber.style.height = '1.4em';
+            lineNumbersContent.appendChild(lineNumber);
+          }
+          
+          lineNumbersContainer.appendChild(lineNumbersContent);
+          codeContainerRef.current.appendChild(lineNumbersContainer);
+          
+          // 同步滚动处理
+          const codeElement = preRef.current;
+          codeElement.addEventListener('scroll', () => {
+            if (lineNumbersContainer) {
+              lineNumbersContainer.scrollTop = codeElement.scrollTop;
+            }
+          });
+        }
+      }, 10);
+    }
+  }, [code, resolvedTheme]);
 
   const themeClass = useMemo(() => {
     // 根据主题切换样式类
@@ -85,6 +158,12 @@ const CodeHighlighter = ({ code }: { code: string }) => {
         .prism-dark {
           background-color: #1e1e1e !important;
           color: #d4d4d4 !important;
+          position: relative;
+          padding-left: 3em !important;
+          line-height: 1.4;
+          overflow: auto;
+          max-height: 100%;
+          font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
         }
         .prism-dark .token.comment { color: #6a9955 !important; }
         .prism-dark .token.keyword { color: #569cd6 !important; }
@@ -93,12 +172,20 @@ const CodeHighlighter = ({ code }: { code: string }) => {
         .prism-dark .token.punctuation { color: #d4d4d4 !important; }
         .prism-dark .token.operator { color: #d4d4d4 !important; }
         .prism-dark .token.number { color: #b5cea8 !important; }
+        .prism-dark .token.variable { color: #9cdcfe !important; }
+        .prism-dark .token.global-variable { color: #f8c555 !important; font-weight: bold; }
       `;
     } else {
       style.innerHTML = `
         .prism-light {
           background-color: #f5f5f5 !important;
           color: #333 !important;
+          position: relative;
+          padding-left: 3em !important;
+          line-height: 1.4;
+          overflow: auto;
+          max-height: 100%;
+          font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
         }
         .prism-light .token.comment { color: #008000 !important; }
         .prism-light .token.keyword { color: #0000ff !important; }
@@ -107,6 +194,8 @@ const CodeHighlighter = ({ code }: { code: string }) => {
         .prism-light .token.punctuation { color: #333 !important; }
         .prism-light .token.operator { color: #000 !important; }
         .prism-light .token.number { color: #098658 !important; }
+        .prism-light .token.variable { color: #0070c1 !important; }
+        .prism-light .token.global-variable { color: #e36209 !important; font-weight: bold; }
       `;
     }
     document.head.appendChild(style);
@@ -117,9 +206,55 @@ const CodeHighlighter = ({ code }: { code: string }) => {
   }, [resolvedTheme]);
 
   return (
-    <pre ref={preRef} className={`language-sql ${themeClass}`}>
-      <code>{code}</code>
-    </pre>
+    <div ref={codeContainerRef} className="relative" style={{height: '100%', minHeight: '300px'}}>
+      <pre ref={preRef} className={`language-sql ${themeClass}`} style={{fontSize: '0.9em', maxHeight: '100%', overflow: 'auto', margin: 0, padding: '0.5em 0.5em 0.5em 3em'}}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+// 搜索组件 - 使用内部状态完全隔离
+const SearchBox = ({ onSearch }: { onSearch: (term: string) => void }) => {
+  const [inputValue, setInputValue] = useState("");
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+  
+  const handleSearch = () => {
+    if (inputValue.trim()) {
+      onSearch(inputValue.trim());
+    }
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  };
+  
+  return (
+    <div className="mb-2">
+      <div className="flex items-center space-x-1">
+        <Input
+          type="text"
+          placeholder="输入关键词模糊搜索..."
+          value={inputValue}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          className="w-full h-7 text-xs"
+        />
+        <Button 
+          size="sm" 
+          className="h-7 px-2" 
+          onClick={handleSearch}
+        >
+          <Search className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
   );
 };
 
@@ -214,9 +349,10 @@ export default function DatabaseStructurePage() {
       // 构建API URL
       let apiUrl = `/api/services/database/${type}?page=${page}&pageSize=20`;
       
-      // 添加搜索条件
+      // 添加搜索条件 - 使用模糊查询参数，不需要在前端处理大小写
       if (searchTerm) {
-        apiUrl += `&prefix=${encodeURIComponent(searchTerm)}`;
+        // 使用search参数实现模糊查询
+        apiUrl += `&search=${encodeURIComponent(searchTerm)}&ignoreCase=true`;
       }
       
       // 对于表和视图，第一页或搜索时加载列信息
@@ -225,6 +361,9 @@ export default function DatabaseStructurePage() {
       if (includeColumns) {
         apiUrl += `&includeColumns=true`;
       }
+      
+      // 打印实际API请求URL
+      console.log(`数据库查询API: ${apiUrl}`);
       
       const response = await fetch(apiUrl);
       
@@ -416,9 +555,15 @@ export default function DatabaseStructurePage() {
       // 设置已加载标志
       setObjectsLoaded(prev => ({...prev, [type]: true}));
       
+      // 搜索完成后重置搜索状态
+      if (searchTerm) {
+        setIsSearching(false);
+      }
+      
     } catch (error) {
       console.error(`获取${getObjectTypeName(type)}失败:`, error);
       setError(error instanceof Error ? error.message : "未知错误");
+      setIsSearching(false);
     } finally {
       setLoading(prev => ({...prev, [type]: false}));
       setIsLoading(false);
@@ -487,34 +632,31 @@ export default function DatabaseStructurePage() {
     if (activeObjectType === "tables") {
       loadTableStructure(objectName);
     } else if (activeObjectType === "views") {
-      // 视图处理逻辑
-      const view = dbObjects.views.find(v => v.name === objectName);
-      if (view && (!view.columns || view.columns.length === 0)) {
-        setDetailLoading(true);
-        try {
-          const response = await fetch(`/api/services/database/views/detail?name=${encodeURIComponent(objectName)}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.view) {
-              setDbObjects(prev => {
-                const newViews = [...prev.views];
-                const idx = newViews.findIndex(v => v.name === objectName);
-                if (idx >= 0) {
-                  newViews[idx] = {
-                    ...newViews[idx],
-                    columns: data.view.columns || []
-                  };
-                }
-                return {...prev, views: newViews};
-              });
-            }
+      // 视图处理逻辑 - 改为获取创建脚本而不是结构
+      setDetailLoading(true);
+      try {
+        const response = await fetch(`/api/services/database/script?type=views&name=${encodeURIComponent(objectName)}&full=true`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.script) {
+            setDbObjects(prev => {
+              const newViews = [...prev.views];
+              const idx = newViews.findIndex(v => v.name === objectName);
+              if (idx >= 0) {
+                newViews[idx] = {
+                  ...newViews[idx],
+                  definition: data.script // 保存创建脚本
+                };
+              }
+              return {...prev, views: newViews};
+            });
           }
-        } catch (error) {
-          console.error("加载视图结构失败:", error);
-          toast.error("加载视图结构失败");
-        } finally {
-          setDetailLoading(false);
         }
+      } catch (error) {
+        console.error("加载视图定义失败:", error);
+        toast.error("加载视图定义失败");
+      } finally {
+        setDetailLoading(false);
       }
     } else if ((activeObjectType === "procedures" || activeObjectType === "functions")) {
       // 存储过程或函数
@@ -565,10 +707,13 @@ export default function DatabaseStructurePage() {
     }
   }, [activeObject, activeObjectType, dbObjects, loadTableStructure]);
 
-  // 搜索框输入处理 - 添加防抖功能
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchTerm(value);
-  }, []);
+  // 执行搜索
+  const handleSearch = useCallback((term: string) => {
+    console.log("执行模糊搜索:", term);
+    setIsSearching(true);
+    // 不需要转换大小写，保持原始输入，让API处理不区分大小写的搜索
+    loadPage(activeObjectType, 1, term);
+  }, [activeObjectType, loadPage]);
 
   // 修改实现视图过滤和搜索的Effect，修复循环请求问题
   useEffect(() => {
@@ -585,8 +730,12 @@ export default function DatabaseStructurePage() {
       const timer = setTimeout(() => {
         const activeObjects = dbObjects[activeObjectType as keyof typeof dbObjects];
         const filtered = activeObjects.filter((obj: DbTable | DbRoutine) => {
-          // 模糊匹配名称
-          return obj.name.toLowerCase().includes(searchTerm.toLowerCase());
+          // 模糊匹配名称 - 确保不区分大小写
+          const objName = obj.name.toLowerCase();
+          const searchLower = searchTerm.toLowerCase();
+          
+          // 检查名称是否包含搜索词（不区分大小写）
+          return objName.includes(searchLower);
         });
         
         setFilteredObjects(filtered);
@@ -912,18 +1061,15 @@ export default function DatabaseStructurePage() {
       );
     }
 
-    // 针对表和视图显示结构
-    if (activeObjectType === "tables" || activeObjectType === "views") {
+    // 针对表显示结构
+    if (activeObjectType === "tables") {
       const tableData = activeData as DbTable;
       return (
         <Card>
           <CardHeader className="pb-2 pt-3 px-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                {activeObjectType === "tables" ? 
-                  <Table2 className="h-4 w-4 text-primary" /> : 
-                  <Eye className="h-4 w-4 text-primary" />
-                }
+                <Table2 className="h-4 w-4 text-primary" />
                 <CardTitle className="text-base flex items-center gap-2">
                   <span className="cursor-pointer hover:underline" onClick={() => copyCreateSql(activeObjectType, tableData.name)}>
                     {tableData.name}
@@ -1031,19 +1177,21 @@ export default function DatabaseStructurePage() {
         </Card>
       );
     } 
-    // 针对存储过程和函数显示定义
+    // 视图、存储过程和函数显示定义 - 将视图改为与存储过程、函数一样显示创建脚本
     else {
       const routineData = activeData as DbRoutine;
+      const typeIcon = activeObjectType === "views" 
+        ? <Eye className="h-4 w-4 text-primary" />
+        : (activeObjectType === "procedures" 
+            ? <BookOpen className="h-4 w-4 text-primary" /> 
+            : <Code className="h-4 w-4 text-primary" />);
       
       return (
-        <Card>
-          <CardHeader className="pb-2 pt-3 px-3">
+        <Card className="h-full">
+          <CardHeader className="pb-1 pt-2 px-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                {activeObjectType === "procedures" ? 
-                  <BookOpen className="h-4 w-4 text-primary" /> : 
-                  <Code className="h-4 w-4 text-primary" />
-                }
+                {typeIcon}
                 <CardTitle className="text-base flex items-center gap-2">
                   <span className="cursor-pointer hover:underline" onClick={() => copyCreateSql(activeObjectType, routineData.name)}>
                     {routineData.name}
@@ -1061,22 +1209,25 @@ export default function DatabaseStructurePage() {
                 </CardTitle>
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-              <span>创建: {new Date(routineData.createDate).toLocaleString()}</span>
-              <span>|</span>
-              <span>修改: {new Date(routineData.modifyDate).toLocaleString()}</span>
-            </div>
+            {/* 对于存储过程和函数显示创建/修改日期 - 使用更紧凑的布局 */}
+            {(activeObjectType === "procedures" || activeObjectType === "functions") && (
+              <div className="flex items-center gap-2 mt-0 text-[10px] text-muted-foreground">
+                <span>创建: {new Date(routineData.createDate).toLocaleString()}</span>
+                <span>|</span>
+                <span>修改: {new Date(routineData.modifyDate).toLocaleString()}</span>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <div className="border-t">
-              <div className="overflow-auto max-h-[calc(100vh-240px)]">
+              <div className="overflow-hidden max-h-[calc(100vh-140px)]">
                 {detailLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
                     <span>加载代码中...</span>
                   </div>
                 ) : routineData.definition ? (
-                  <div className="p-4">
+                  <div className="h-[calc(100vh-140px)]">
                     <CodeHighlighter code={routineData.definition} />
                   </div>
                 ) : (
@@ -1091,65 +1242,59 @@ export default function DatabaseStructurePage() {
         </Card>
       );
     }
-  }, [activeObjectType, getActiveObjectData, copying, copyCreateSql, copyAlterAddSql, detailLoading]);
+  }, [activeObjectType, getActiveObjectData, copying, copyCreateSql, copyAlterAddSql, detailLoading, getObjectTypeName]);
 
   return (
-    <div className="container mx-auto py-1 px-1">
+    <div className="container mx-auto py-0 px-0">
       <Toaster />
       
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-2">
-        {/* 左侧控制面板 - 调整布局 */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-1">
+        {/* 左侧控制面板 - 调整布局比例减小 */}
         <div className="lg:col-span-1">
           <div className="space-y-2">
             <Card className="overflow-hidden">
               <CardHeader className="py-1 px-2">
                 <div className="w-full">
-                  {/* 搜索框放在顶部 */}
-                  <div className="space-y-1 mb-2">
-                    <Input
-                      placeholder={`输入名称搜索...`}
-                      value={searchTerm}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      className="w-full h-7 text-xs"
-                    />
-                  </div>
+                  {/* 使用自包含搜索组件 */}
+                  <SearchBox onSearch={handleSearch} />
                   
-                  {/* 对象类型选择 */}
+                  {/* 对象类型选择 - 调整按钮布局避免内容溢出 */}
                   <div className="grid grid-cols-4 gap-1">
                     <Button 
                       variant={activeObjectType === "tables" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-0 text-[10px] h-6 w-full"
+                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
                       onClick={() => setActiveObjectType("tables")}
                     >
-                      <Table2 className="h-2.5 w-2.5 mr-0.5" />
-                      <span>表</span>
+                      <Table2 className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+                      <span className="truncate">表</span>
                     </Button>
                     
                     <Button 
                       variant={activeObjectType === "views" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-0 text-[10px] h-6 w-full"
+                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
                       onClick={() => setActiveObjectType("views")}
                     >
-                      <Eye className="h-2.5 w-2.5 mr-0.5" />
-                      <span>视图</span>
+                      <Eye className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+                      <span className="truncate">视图</span>
                     </Button>
                     
                     <Button 
                       variant={activeObjectType === "procedures" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-0 text-[10px] h-6 w-full"
+                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
                       onClick={() => setActiveObjectType("procedures")}
+                      title="存储过程"
                     >
-                      <BookOpen className="h-2.5 w-2.5 mr-0.5" />
-                      <span>存储过程</span>
+                      <BookOpen className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+                      <span className="truncate">过程</span>
                     </Button>
                     
                     <Button 
                       variant={activeObjectType === "functions" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-0 text-[10px] h-6 w-full"
+                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
                       onClick={() => setActiveObjectType("functions")}
                     >
-                      <Code className="h-2.5 w-2.5 mr-0.5" />
-                      <span>函数</span>
+                      <Code className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
+                      <span className="truncate">函数</span>
                     </Button>
                   </div>
                 </div>
@@ -1205,8 +1350,8 @@ export default function DatabaseStructurePage() {
           </div>
         </div>
         
-        {/* 右侧详情显示 - 增加宽度 */}
-        <div className="lg:col-span-4">
+        {/* 右侧详情显示 - 增加宽度比例 */}
+        <div className="lg:col-span-5">
           {error && (
             <Alert variant="destructive" className="mb-2">
               <AlertCircle className="h-4 w-4" />

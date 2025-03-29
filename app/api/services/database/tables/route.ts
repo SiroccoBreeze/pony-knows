@@ -51,6 +51,12 @@ export async function GET(request: Request) {
   const pageSize = parseInt(searchParams.get("pageSize") || "20");
   const prefix = searchParams.get("prefix") || "";
   const includeColumns = searchParams.get("includeColumns") === "true";
+  // 添加搜索参数和不区分大小写选项 - 修复ignoreCase参数解析
+  const searchTerm = searchParams.get("search") || "";
+  // 强制启用不区分大小写，或者检查参数值
+  const ignoreCase = true; // 强制为true，不再依赖URL参数
+  
+  console.log("实际接收到的参数:", searchParams.toString());
   
   let pool: sql.ConnectionPool | undefined;
   
@@ -67,21 +73,57 @@ export async function GET(request: Request) {
     // 创建数据库连接池
     pool = await new sql.ConnectionPool(sqlConfig).connect();
 
+    // 构建LIKE查询条件
+    let whereClause = "t.is_ms_shipped = 0";
+    let searchValue = "";
+    
+    if (searchTerm) {
+      // 使用搜索词进行模糊匹配 - 总是小写
+      searchValue = `%${searchTerm.toLowerCase()}%`; 
+      
+      // 始终使用不区分大小写的查询
+      whereClause += " AND (LOWER(t.name) LIKE @search OR t.name COLLATE SQL_Latin1_General_CP1_CI_AS LIKE @search)";
+    } else if (prefix) {
+      // 兼容旧的prefix参数
+      searchValue = `${prefix}%`;
+      whereClause += " AND t.name LIKE @search";
+    }
+
+    // 打印SQL语句和参数
+    console.log("搜索条件:", { searchTerm, ignoreCase, searchValue });
+    const countSql = `SELECT COUNT(*) as total FROM sys.tables t WHERE ${whereClause}`;
+    console.log("统计SQL:", countSql);
+    
+    // 另外进行一次直接测试查询，确认SQL执行结果
+    if (searchTerm) {
+      const testSql = `SELECT name FROM sys.tables WHERE type='U' and LOWER(name) like '%${searchTerm.toLowerCase()}%'`;
+      console.log("测试SQL:", testSql);
+      try {
+        const testResult = await pool.request().query(testSql);
+        console.log("测试SQL结果:", testResult.recordset);
+      } catch (err) {
+        console.error("测试SQL错误:", err);
+      }
+    }
+
     // 查询表总数
     const countResult = await pool.request()
-      .input('prefix', sql.NVarChar, prefix + '%')
+      .input('search', sql.NVarChar, searchValue)
       .query(`
         SELECT COUNT(*) as total
         FROM sys.tables t
-        WHERE t.is_ms_shipped = 0
-        AND t.name LIKE @prefix
+        WHERE ${whereClause}
       `);
     
     const total = countResult.recordset[0].total;
 
+    // 打印查询SQL
+    const querySql = `SELECT t.name AS name FROM sys.tables t WHERE ${whereClause} ORDER BY t.name OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY`;
+    console.log("查询SQL:", querySql);
+
     // 使用分页查询表
     const tablesResult = await pool.request()
-      .input('prefix', sql.NVarChar, prefix + '%')
+      .input('search', sql.NVarChar, searchValue)
       .input('offset', sql.Int, (page - 1) * pageSize)
       .input('pageSize', sql.Int, pageSize)
       .query(`
@@ -90,8 +132,7 @@ export async function GET(request: Request) {
         FROM 
           sys.tables t
         WHERE 
-          t.is_ms_shipped = 0
-          AND t.name LIKE @prefix
+          ${whereClause}
         ORDER BY 
           t.name
         OFFSET @offset ROWS

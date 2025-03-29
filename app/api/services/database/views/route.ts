@@ -51,6 +51,9 @@ export async function GET(request: Request) {
   const pageSize = parseInt(searchParams.get("pageSize") || "20");
   const prefix = searchParams.get("prefix") || "";
   const includeColumns = searchParams.get("includeColumns") === "true";
+  const searchTerm = searchParams.get("search") || "";
+  // 强制启用不区分大小写
+  const ignoreCase = true; // 强制为true，不再依赖URL参数
   const offset = (page - 1) * pageSize;
   
   let pool: sql.ConnectionPool | undefined;
@@ -67,22 +70,38 @@ export async function GET(request: Request) {
 
     // 创建数据库连接池
     pool = await new sql.ConnectionPool(sqlConfig).connect();
+    
+    // 构建LIKE查询条件
+    let whereClause = "v.is_ms_shipped = 0";
+    let searchValue = "";
+    
+    if (searchTerm) {
+      // 使用搜索词进行模糊匹配 - 总是小写
+      searchValue = `%${searchTerm.toLowerCase()}%`;
+      
+      // 始终使用不区分大小写的查询
+      whereClause += " AND (LOWER(v.name) LIKE @search OR v.name COLLATE SQL_Latin1_General_CP1_CI_AS LIKE @search)";
+    } else if (prefix) {
+      // 兼容旧的prefix参数
+      searchValue = `${prefix}%`;
+      whereClause += " AND v.name LIKE @search";
+    }
+
+    // 打印SQL语句和参数
+    console.log("视图搜索条件:", { searchTerm, ignoreCase, searchValue });
+    const countSql = `SELECT COUNT(*) as total FROM sys.views v WHERE ${whereClause}`;
+    console.log("视图统计SQL:", countSql);
 
     // 查询视图总数
     const countResult = await pool.request()
-      .input('prefix', sql.NVarChar, prefix + '%')
-      .query(`
-        SELECT COUNT(*) as total
-        FROM sys.views v
-        WHERE v.is_ms_shipped = 0
-        AND v.name LIKE @prefix
-      `);
+      .input('search', sql.NVarChar, searchValue)
+      .query(countSql);
     
     const total = countResult.recordset[0].total;
 
     // 查询视图（带分页）
     const viewsResult = await pool.request()
-      .input('prefix', sql.NVarChar, prefix + '%')
+      .input('search', sql.NVarChar, searchValue)
       .input('offset', sql.Int, offset)
       .input('pageSize', sql.Int, pageSize)
       .query(`
@@ -91,8 +110,7 @@ export async function GET(request: Request) {
         FROM 
           sys.views v
         WHERE 
-          v.is_ms_shipped = 0
-          AND v.name LIKE @prefix
+          ${whereClause}
         ORDER BY 
           v.name
         OFFSET @offset ROWS
