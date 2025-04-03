@@ -1,26 +1,26 @@
-import NextAuth from "next-auth";
-import { compare } from "bcryptjs";
-import CredentialsProvider from "next-auth/providers/credentials";
+import { NextAuthOptions, DefaultSession } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
-import type { AuthOptions } from "next-auth";
-import { authOptions as authOptionsFromLib } from "@/lib/auth/options";
+import { prisma } from "@/lib/prisma";
+import GithubProvider from "next-auth/providers/github";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { compare } from "bcryptjs";
 
-// 初始化 Prisma 客户端
-const prisma = new PrismaClient();
-
-// 扩展 User 类型
-interface ExtendedUser {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
+// 扩展 Session 类型
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: {
+      id: string;
+    } & DefaultSession["user"]
+  }
 }
 
-// NextAuth 配置
-export const authOptions: AuthOptions = {
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
+    GithubProvider({
+      clientId: process.env.GITHUB_ID || "",
+      clientSecret: process.env.GITHUB_SECRET || "",
+    }),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -59,7 +59,7 @@ export const authOptions: AuthOptions = {
           };
         } catch (error) {
           console.error("认证错误:", error);
-          throw new Error("用户名或密码不正确。");
+          throw error;
         }
       }
     })
@@ -72,24 +72,20 @@ export const authOptions: AuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as ExtendedUser).id = token.id as string;
+      if (session?.user) {
+        session.user.id = token.id as string;
       }
       return session;
     }
   },
+  pages: {
+    signIn: "/auth/login",
+    error: "/auth/error",
+  },
   session: {
     strategy: "jwt",
-    maxAge: 3 * 60 * 60, // 3小时（以秒为单位）
+    maxAge: 3 * 60 * 60, // 3小时
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
-  pages: {
-    signIn: "/auth/login",
-    error: "/auth/error"
-  }
-};
-
-const handler = NextAuth(authOptionsFromLib);
-
-export { handler as GET, handler as POST }; 
+}; 

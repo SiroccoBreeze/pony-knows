@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -8,7 +8,7 @@ import * as z from "zod";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Save, Rocket } from 'lucide-react';
+import { ArrowLeft, Save, Rocket, Plus, Check } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -27,6 +27,12 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import VditorEditor, { VditorEditorRef } from '@/components/editor/VditorEditor';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // 定义表单验证模式
 const formSchema = z.object({
@@ -73,6 +79,9 @@ export default function PostEditPage({ params }: PostEditPageProps) {
   const contentRef = useRef("");
   const [post, setPost] = useState<Post | null>(null);
   const [isLoadingPost, setIsLoadingPost] = useState(true);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [open, setOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
 
   // 获取帖子数据
   React.useEffect(() => {
@@ -103,6 +112,29 @@ export default function PostEditPage({ params }: PostEditPageProps) {
 
     fetchPost();
   }, [id]);
+
+  // 获取所有标签
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const response = await fetch('/api/tags');
+        if (!response.ok) {
+          throw new Error('获取标签失败');
+        }
+        const data = await response.json();
+        setTags(data);
+      } catch (error) {
+        console.error('获取标签失败:', error);
+        toast({
+          title: "错误",
+          description: "获取标签失败，请重试",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchTags();
+  }, []);
 
   // 初始化表单
   const form = useForm<FormValues>({
@@ -155,6 +187,13 @@ export default function PostEditPage({ params }: PostEditPageProps) {
     }
   }, [post, form]);
 
+  // 初始化已选标签
+  useEffect(() => {
+    if (post?.tags) {
+      setSelectedTags(post.tags);
+    }
+  }, [post]);
+
   // 同步编辑器内容到 ref
   const handleContentChange = (value: string) => {
     contentRef.current = value;
@@ -173,6 +212,35 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       editor.getInstance().setValue(contentRef.current);
     }
   }, [form.formState.submitCount]);
+
+  // 处理标签选择
+  const handleTagSelect = (tag: Tag) => {
+    if (!selectedTags.find(t => t.id === tag.id)) {
+      const newTags = [...selectedTags, tag];
+      setSelectedTags(newTags);
+      form.setValue("tags", newTags.map(t => t.name).join(", "), {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    } else {
+      const newTags = selectedTags.filter(t => t.id !== tag.id);
+      setSelectedTags(newTags);
+      form.setValue("tags", newTags.map(t => t.name).join(", "), {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    }
+  };
+
+  // 处理标签移除
+  const handleTagRemove = (tagId: string) => {
+    const newTags = selectedTags.filter(tag => tag.id !== tagId);
+    setSelectedTags(newTags);
+    form.setValue("tags", newTags.map(t => t.name).join(", "), {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
 
   // 保存草稿
   const saveDraft = async () => {
@@ -338,9 +406,9 @@ export default function PostEditPage({ params }: PostEditPageProps) {
         <Card>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardHeader>
+            {/* <CardHeader>
               <CardTitle>帖子信息</CardTitle>
-            </CardHeader>
+            </CardHeader> */}
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <FormField
@@ -363,10 +431,94 @@ export default function PostEditPage({ params }: PostEditPageProps) {
                   control={form.control}
                   name="tags"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>标签</FormLabel>
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="mb-2">标签</FormLabel>
                       <FormControl>
-                        <Input placeholder="输入标签，用逗号分隔" {...field} />
+                        <div className="relative">
+                          <div className="flex items-center gap-2">
+                            <Popover open={open} onOpenChange={setOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  role="combobox"
+                                  aria-expanded={open}
+                                  className="h-8 w-8"
+                                  onClick={() => setOpen(true)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0" align="start">
+                                <Command className="w-full">
+                                  <CommandInput 
+                                    placeholder="搜索标签..." 
+                                    className="h-9 border-none focus:ring-0"
+                                  />
+                                  <CommandEmpty className="py-6 text-center text-sm">
+                                    未找到相关标签
+                                  </CommandEmpty>
+                                  <ScrollArea className="h-[200px]">
+                                    <CommandGroup>
+                                      {tags.map((tag) => {
+                                        const isSelected = selectedTags.some(t => t.id === tag.id);
+                                        return (
+                                          <CommandItem
+                                            key={tag.id}
+                                            onSelect={() => handleTagSelect(tag)}
+                                            className={cn(
+                                              "flex items-center gap-2 px-2 py-1.5",
+                                              isSelected && "bg-primary/5"
+                                            )}
+                                          >
+                                            <div className={cn(
+                                              "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                              isSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                                            )}>
+                                              {isSelected && (
+                                                <Check className="h-3 w-3" />
+                                              )}
+                                            </div>
+                                            <span className={cn(
+                                              "flex-1",
+                                              isSelected && "font-medium"
+                                            )}>
+                                              {tag.name}
+                                            </span>
+                                          </CommandItem>
+                                        );
+                                      })}
+                                    </CommandGroup>
+                                  </ScrollArea>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <div className="flex-1 flex flex-wrap gap-1.5 min-h-[2.5rem] py-1">
+                              {selectedTags.length === 0 ? (
+                                <span className="text-muted-foreground text-sm py-1">
+                                  请选择标签...
+                                </span>
+                              ) : (
+                                selectedTags.map((tag) => (
+                                  <Badge
+                                    key={tag.id}
+                                    variant="secondary"
+                                    className="flex items-center gap-1 px-2 py-1 text-sm bg-primary/10 hover:bg-primary/20 transition-colors"
+                                  >
+                                    {tag.name}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTagRemove(tag.id)}
+                                      className="ml-1 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

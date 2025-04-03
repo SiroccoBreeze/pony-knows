@@ -156,8 +156,8 @@ const CodeHighlighter = ({ code }: { code: string }) => {
     if (resolvedTheme === 'dark') {
       style.innerHTML = `
         .prism-dark {
-          background-color: #1e1e1e !important;
-          color: #d4d4d4 !important;
+          background-color: #1a1a1a !important;
+          color: #e0e0e0 !important;
           position: relative;
           padding-left: 3em !important;
           line-height: 1.4;
@@ -178,8 +178,8 @@ const CodeHighlighter = ({ code }: { code: string }) => {
     } else {
       style.innerHTML = `
         .prism-light {
-          background-color: #f5f5f5 !important;
-          color: #333 !important;
+          background-color: #f6f8fa !important;
+          color: #24292e !important;
           position: relative;
           padding-left: 3em !important;
           line-height: 1.4;
@@ -187,14 +187,14 @@ const CodeHighlighter = ({ code }: { code: string }) => {
           max-height: 100%;
           font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
         }
-        .prism-light .token.comment { color: #008000 !important; }
-        .prism-light .token.keyword { color: #0000ff !important; }
-        .prism-light .token.string { color: #a31515 !important; }
-        .prism-light .token.function { color: #795e26 !important; }
-        .prism-light .token.punctuation { color: #333 !important; }
-        .prism-light .token.operator { color: #000 !important; }
-        .prism-light .token.number { color: #098658 !important; }
-        .prism-light .token.variable { color: #0070c1 !important; }
+        .prism-light .token.comment { color: #6a737d !important; }
+        .prism-light .token.keyword { color: #d73a49 !important; }
+        .prism-light .token.string { color: #032f62 !important; }
+        .prism-light .token.function { color: #6f42c1 !important; }
+        .prism-light .token.punctuation { color: #24292e !important; }
+        .prism-light .token.operator { color: #24292e !important; }
+        .prism-light .token.number { color: #005cc5 !important; }
+        .prism-light .token.variable { color: #005cc5 !important; }
         .prism-light .token.global-variable { color: #e36209 !important; font-weight: bold; }
       `;
     }

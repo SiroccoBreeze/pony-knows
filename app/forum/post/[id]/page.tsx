@@ -10,6 +10,7 @@ import { Eye, MessageSquare, Calendar, List, X } from "lucide-react";
 import Link from "next/link";
 import MarkdownRenderer from "@/components/markdown/markdown-renderer";
 import { toast, Toaster } from "react-hot-toast";
+import CommentList from "@/components/comments/CommentList";
 
 // 定义帖子接口
 interface Post {
@@ -529,7 +530,7 @@ export default function PostDetailPage() {
               评论 ({post?._count.comments || 0})
             </h2>
             <Card className="p-6 shadow-sm border-neutral-100 dark:border-neutral-800">
-              <p className="text-center text-muted-foreground py-8">暂无评论功能</p>
+              <CommentList postId={params.id} />
             </Card>
           </div>
         </div>

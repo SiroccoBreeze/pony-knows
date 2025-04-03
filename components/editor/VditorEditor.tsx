@@ -47,7 +47,7 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
             mode: 'wysiwyg', // 默认使用所见即所得模式
             placeholder,
             theme: 'classic',
-            icon: 'material',
+            icon: 'ant', // 使用 ant 图标
             toolbar: [
               'emoji', 'headings', 'bold', 'italic', 'strike', 'link', '|',
               'list', 'ordered-list', 'check', 'outdent', 'indent', '|',

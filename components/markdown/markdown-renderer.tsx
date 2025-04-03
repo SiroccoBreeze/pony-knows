@@ -1,89 +1,161 @@
-'use client';
-
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import rehypeHighlight from 'rehype-highlight';
-import 'highlight.js/styles/github.css';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import Link from 'next/link';
 
 interface MarkdownRendererProps {
   content: string;
-  className?: string;
 }
 
-export default function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
+export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className={`prose prose-slate max-w-none dark:prose-invert ${className}`}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeHighlight]}
-        components={{
-          // 自定义h1-h6标签样式
-          h1: (props) => <h1 className="text-2xl font-bold my-4" {...props} />,
-          h2: (props) => <h2 className="text-xl font-bold my-3" {...props} />,
-          h3: (props) => <h3 className="text-lg font-bold my-2" {...props} />,
-          h4: (props) => <h4 className="text-base font-bold my-2" {...props} />,
-          h5: (props) => <h5 className="text-sm font-bold my-1" {...props} />,
-          h6: (props) => <h6 className="text-xs font-bold my-1" {...props} />,
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[rehypeRaw]}
+      components={{
+        // 代码块渲染
+        code({ inline, className, children, ...props }) {
+          const match = /language-(\w+)/.exec(className || '');
+          return !inline && match ? (
+            <SyntaxHighlighter
+              style={vscDarkPlus}
+              language={match[1]}
+              PreTag="div"
+              className="rounded-md my-4"
+              {...props}
+            >
+              {String(children).replace(/\n$/, '')}
+            </SyntaxHighlighter>
+          ) : (
+            <code className={`${className} px-1 py-0.5 bg-muted rounded text-sm`} {...props}>
+              {children}
+            </code>
+          );
+        },
+        
+        // 图片渲染
+        img({ ...props }) {
+          const { src, alt, title } = props;
+          return (
+            <span className="block relative w-full my-6 overflow-hidden rounded-lg">
+              <img 
+                src={src as string} 
+                alt={alt as string} 
+                title={title as string} 
+                className="w-full h-auto"
+                loading="lazy"
+              />
+            </span>
+          );
+        },
+        
+        // 标题渲染
+        h1: ({ children, ...props }) => {
+          return <h1 className="mt-8 mb-4 text-3xl font-bold scroll-mt-[120px]" {...props}>{children}</h1>;
+        },
+        h2: ({ children, ...props }) => {
+          return <h2 className="mt-6 mb-4 text-2xl font-bold scroll-mt-[120px]" {...props}>{children}</h2>;
+        },
+        h3: ({ children, ...props }) => {
+          return <h3 className="mt-5 mb-3 text-xl font-bold scroll-mt-[120px]" {...props}>{children}</h3>;
+        },
+        h4: ({ children, ...props }) => {
+          return <h4 className="mt-4 mb-2 text-lg font-bold scroll-mt-[120px]" {...props}>{children}</h4>;
+        },
+        h5: ({ children, ...props }) => {
+          return <h5 className="mt-3 mb-2 text-md font-bold scroll-mt-[120px]" {...props}>{children}</h5>;
+        },
+        h6: ({ children, ...props }) => {
+          return <h6 className="mt-3 mb-2 text-base font-bold scroll-mt-[120px]" {...props}>{children}</h6>;
+        },
+        
+        // 链接渲染
+        a: ({ children, href, ...props }) => {
+          const isInternal = href?.startsWith('/') || href?.startsWith('#');
           
-          // 自定义段落和列表样式
-          p: (props) => <p className="my-2" {...props} />,
-          ul: (props) => <ul className="list-disc pl-5 my-2" {...props} />,
-          ol: (props) => <ol className="list-decimal pl-5 my-2" {...props} />,
-          li: (props) => <li className="my-1" {...props} />,
-          
-          // 自定义链接和图片样式
-          a: (props) => (
-            <a className="text-primary hover:underline" target="_blank" rel="noopener noreferrer" {...props} />
-          ),
-          img: (props) => (
-            <img className="max-w-full rounded-md my-4" {...props} alt={props.alt || 'image'} />
-          ),
-          
-          // 自定义表格样式
-          table: (props) => (
-            <div className="overflow-x-auto my-4">
-              <table className="min-w-full border border-gray-300 dark:border-gray-700" {...props} />
-            </div>
-          ),
-          thead: (props) => <thead className="bg-gray-100 dark:bg-gray-800" {...props} />,
-          tbody: (props) => <tbody {...props} />,
-          tr: (props) => <tr className="border-b border-gray-300 dark:border-gray-700" {...props} />,
-          th: (props) => (
-            <th className="px-4 py-2 text-left font-semibold" {...props} />
-          ),
-          td: (props) => <td className="px-4 py-2" {...props} />,
-          
-          // 自定义代码块样式
-          code: ({ inline, className, children, ...props }: any) => {
-            const match = /language-(\w+)/.exec(className || '');
-            return !inline && match ? (
-              <div className="relative">
-                <div className="absolute top-0 right-0 bg-gray-200 dark:bg-gray-700 text-xs px-2 py-1 rounded-bl-md">
-                  {match[1]}
-                </div>
-                <code className={`${className} block p-4 mt-4 rounded-md bg-gray-100 dark:bg-gray-800 overflow-x-auto`} {...props}>
-                  {children}
-                </code>
-              </div>
-            ) : (
-              <code className="px-1 py-0.5 rounded-sm bg-gray-200 dark:bg-gray-800 text-sm" {...props}>
+          if (isInternal) {
+            return (
+              <Link href={href || '#'} className="text-primary hover:underline" {...props}>
                 {children}
-              </code>
+              </Link>
             );
-          },
+          }
           
-          // 自定义引用和分割线样式
-          blockquote: (props) => (
-            <blockquote className="pl-4 border-l-4 border-gray-300 dark:border-gray-700 italic my-4" {...props} />
-          ),
-          hr: (props) => <hr className="my-6 border-gray-300 dark:border-gray-700" {...props} />,
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
+          return (
+            <a 
+              href={href} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-primary hover:underline"
+              {...props}
+            >
+              {children}
+            </a>
+          );
+        },
+        
+        // 段落渲染
+        p: ({ children, ...props }) => {
+          return <p className="mb-4 leading-relaxed" {...props}>{children}</p>;
+        },
+        
+        // 列表渲染
+        ul: ({ children, ...props }) => {
+          return <ul className="mb-4 pl-6 list-disc" {...props}>{children}</ul>;
+        },
+        ol: ({ children, ...props }) => {
+          return <ol className="mb-4 pl-6 list-decimal" {...props}>{children}</ol>;
+        },
+        li: ({ children, ...props }) => {
+          return <li className="mb-1" {...props}>{children}</li>;
+        },
+        
+        // 表格渲染
+        table: ({ children, ...props }) => {
+          return (
+            <div className="overflow-x-auto mb-6">
+              <table className="w-full border-collapse" {...props}>{children}</table>
+            </div>
+          );
+        },
+        thead: ({ children, ...props }) => {
+          return <thead className="bg-muted/50" {...props}>{children}</thead>;
+        },
+        tbody: ({ children, ...props }) => {
+          return <tbody {...props}>{children}</tbody>;
+        },
+        tr: ({ children, ...props }) => {
+          return <tr className="border-b border-border" {...props}>{children}</tr>;
+        },
+        th: ({ children, ...props }) => {
+          return <th className="px-4 py-2 text-left font-semibold" {...props}>{children}</th>;
+        },
+        td: ({ children, ...props }) => {
+          return <td className="px-4 py-2" {...props}>{children}</td>;
+        },
+        
+        // 引用渲染
+        blockquote: ({ children, ...props }) => {
+          return (
+            <blockquote 
+              className="pl-4 border-l-4 border-primary/30 bg-primary/5 py-2 pr-2 my-4 italic"
+              {...props}
+            >
+              {children}
+            </blockquote>
+          );
+        },
+        
+        // 分割线渲染
+        hr: ({ ...props }) => {
+          return <hr className="my-6 border-t border-border" {...props} />;
+        },
+      }}
+    >
+      {content}
+    </ReactMarkdown>
   );
 } 

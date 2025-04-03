@@ -22,7 +22,8 @@ export async function middleware(request: NextRequest) {
   // 获取会话token
   const token = await getToken({ 
     req: request,
-    secret: process.env.NEXTAUTH_SECRET 
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === "production"
   })
   
   console.log(`[中间件] 路径: ${pathname}, Token:`, token ? '存在' : '不存在');
@@ -30,21 +31,13 @@ export async function middleware(request: NextRequest) {
   // 如果用户已登录，放行
   if (token) {
     console.log(`[中间件] 用户已登录, 路径: ${pathname}, 用户ID: ${token.sub}, 放行`);
-    
-    // 创建一个新的响应对象
-    const response = NextResponse.next()
-    
-    // 为了确保cookie能被客户端读取，在响应中添加一些相关头部
-    response.headers.set('X-NextAuth-Token-Found', 'true')
-    
-    return response
+    return NextResponse.next()
   }
   
   // 用户未登录且尝试访问受保护的路由，重定向到登录页面
   console.log(`[中间件] 用户未登录, 路径: ${pathname}, 重定向到登录页`);
   const loginUrl = new URL('/auth/login', request.url)
-  // 保存原始URL，以便登录后可以重定向回来
-  loginUrl.searchParams.set('callbackUrl', encodeURI(request.url))
+  loginUrl.searchParams.set('callbackUrl', request.url)
   
   return NextResponse.redirect(loginUrl)
 }

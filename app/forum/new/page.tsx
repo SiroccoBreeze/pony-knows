@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -8,7 +8,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, Rocket } from "lucide-react";
+import { ArrowLeft, Save, Rocket, Plus, Check, X } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -26,10 +26,12 @@ import {
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import VditorEditor, {
-  VditorEditorRef,
-} from "@/components/editor/VditorEditor";
-import { useUserStore } from "@/store";
+import VditorEditor, { VditorEditorRef } from "@/components/editor/VditorEditor";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // 定义表单验证模式
 const formSchema = z.object({
@@ -41,12 +43,42 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+interface Tag {
+  id: string;
+  name: string;
+}
+
 export default function NewPostPage() {
   const router = useRouter();
   const editorRef = useRef<VditorEditorRef>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const contentRef = useRef(""); // 使用 ref 来存储内容
-  const { user } = useUserStore();
+  const contentRef = useRef("");
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [open, setOpen] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+
+  // 获取所有标签
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const response = await fetch('/api/tags');
+        if (!response.ok) {
+          throw new Error('获取标签失败');
+        }
+        const data = await response.json();
+        setTags(data);
+      } catch (error) {
+        console.error('获取标签失败:', error);
+        toast({
+          title: "错误",
+          description: "获取标签失败，请重试",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchTags();
+  }, []);
 
   // 初始化表单
   const form = useForm<FormValues>({
@@ -69,14 +101,34 @@ export default function NewPostPage() {
     });
   };
 
-  // 保持编辑器内容
-  React.useEffect(() => {
-    if (editorRef.current && contentRef.current) {
-      const editor = editorRef.current;
-      editor.clear();
-      editor.getInstance().setValue(contentRef.current);
+  // 处理标签选择
+  const handleTagSelect = (tag: Tag) => {
+    if (!selectedTags.find(t => t.id === tag.id)) {
+      const newTags = [...selectedTags, tag];
+      setSelectedTags(newTags);
+      form.setValue("tags", newTags.map(t => t.name).join(", "), {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    } else {
+      const newTags = selectedTags.filter(t => t.id !== tag.id);
+      setSelectedTags(newTags);
+      form.setValue("tags", newTags.map(t => t.name).join(", "), {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
     }
-  }, [form.formState.submitCount]); // 仅在表单提交后重新设置内容
+  };
+
+  // 处理标签移除
+  const handleTagRemove = (tagId: string) => {
+    const newTags = selectedTags.filter(tag => tag.id !== tagId);
+    setSelectedTags(newTags);
+    form.setValue("tags", newTags.map(t => t.name).join(", "), {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
 
   // 保存草稿
   const saveDraft = async () => {
@@ -146,7 +198,6 @@ export default function NewPostPage() {
           const error = await response.json();
           errorMessage = error.error || (status === "draft" ? "保存草稿失败" : "发布帖子失败");
         } catch (e) {
-          // JSON解析错误
           console.error("响应解析错误:", e, "状态码:", response.status);
           errorMessage = `${status === "draft" ? "保存草稿" : "发布帖子"}失败: 服务器响应无效`;
         }
@@ -158,19 +209,19 @@ export default function NewPostPage() {
         description: status === "draft"
           ? `《${values.title}》已保存为草稿。`
           : `《${values.title}》已成功发布。`,
-        action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
+        action: <ToastAction altText="close">关闭</ToastAction>,
       });
 
       // 根据状态跳转到不同页面和标签
       router.push(`/user/posts?tab=${status}`);
     } catch (error) {
-      console.error("创建帖子出错:", error);
+      console.error("创建帖子失败:", error);
       toast({
         title: "失败！",
         description:
           error instanceof Error ? error.message : "创建帖子失败，请重试",
-        variant: "default",
-        action: <ToastAction altText="Goto schedule to undo">关闭</ToastAction>,
+        variant: "destructive",
+        action: <ToastAction altText="close">关闭</ToastAction>,
       });
     } finally {
       setIsLoading(false);
@@ -184,15 +235,15 @@ export default function NewPostPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           返回
         </Button>
-        <h1 className="text-2xl font-bold">创建新帖子</h1>
+        <h1 className="text-2xl font-bold">发布新帖</h1>
       </div>
 
       <Card>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardHeader>
+            {/* <CardHeader>
               <CardTitle>帖子信息</CardTitle>
-            </CardHeader>
+            </CardHeader> */}
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <FormField
@@ -202,7 +253,7 @@ export default function NewPostPage() {
                     <FormItem>
                       <FormLabel>标题</FormLabel>
                       <FormControl>
-                        <Input placeholder="请输入帖子标题" {...field} />
+                        <Input placeholder="请输入标题" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -215,10 +266,94 @@ export default function NewPostPage() {
                   control={form.control}
                   name="tags"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>标签</FormLabel>
+                    <FormItem className="flex flex-col">
+                      <FormLabel className="mb-2">标签</FormLabel>
                       <FormControl>
-                        <Input placeholder="输入标签，用逗号分隔" {...field} />
+                        <div className="relative">
+                          <div className="flex items-center gap-2">
+                            <Popover open={open} onOpenChange={setOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  role="combobox"
+                                  aria-expanded={open}
+                                  className="h-8 w-8"
+                                  onClick={() => setOpen(true)}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[200px] p-0" align="start">
+                                <Command className="w-full">
+                                  <CommandInput 
+                                    placeholder="搜索标签..." 
+                                    className="h-9 border-none focus:ring-0"
+                                  />
+                                  <CommandEmpty className="py-6 text-center text-sm">
+                                    未找到相关标签
+                                  </CommandEmpty>
+                                  <ScrollArea className="h-[200px]">
+                                    <CommandGroup>
+                                      {tags.map((tag) => {
+                                        const isSelected = selectedTags.some(t => t.id === tag.id);
+                                        return (
+                                          <CommandItem
+                                            key={tag.id}
+                                            onSelect={() => handleTagSelect(tag)}
+                                            className={cn(
+                                              "flex items-center gap-2 px-2 py-1.5",
+                                              isSelected && "bg-primary/5"
+                                            )}
+                                          >
+                                            <div className={cn(
+                                              "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                              isSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                                            )}>
+                                              {isSelected && (
+                                                <Check className="h-3 w-3" />
+                                              )}
+                                            </div>
+                                            <span className={cn(
+                                              "flex-1",
+                                              isSelected && "font-medium"
+                                            )}>
+                                              {tag.name}
+                                            </span>
+                                          </CommandItem>
+                                        );
+                                      })}
+                                    </CommandGroup>
+                                  </ScrollArea>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <div className="flex-1 flex flex-wrap gap-1.5 min-h-[2.5rem] py-1">
+                              {selectedTags.length === 0 ? (
+                                <span className="text-muted-foreground text-sm py-1">
+                                  请选择标签...
+                                </span>
+                              ) : (
+                                selectedTags.map((tag) => (
+                                  <Badge
+                                    key={tag.id}
+                                    variant="secondary"
+                                    className="flex items-center gap-1 px-2 py-1 text-sm bg-primary/10 hover:bg-primary/20 transition-colors"
+                                  >
+                                    {tag.name}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleTagRemove(tag.id)}
+                                      className="ml-1 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -240,9 +375,9 @@ export default function NewPostPage() {
             </CardContent>
 
             <CardFooter className="flex justify-end space-x-2">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 disabled={isLoading}
                 onClick={saveDraft}
               >
@@ -250,8 +385,9 @@ export default function NewPostPage() {
                 {isLoading ? "保存中..." : "保存草稿"}
               </Button>
               <Button 
-                type="submit" 
+                type="button" 
                 disabled={isLoading}
+                onClick={form.handleSubmit(onSubmit)}
               >
                 <Rocket className="mr-1 h-4 w-4" />
                 {isLoading ? "发布中..." : "发布帖子"}
