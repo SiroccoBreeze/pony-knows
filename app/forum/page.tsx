@@ -41,7 +41,9 @@ export default function ForumPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'latest' | 'hot'>('latest');
+  const [sortBy, setSortBy] = useState<'latest' | 'views'>('latest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [postsPerPage] = useState(15); // 增加每页显示的帖子数量
   const debouncedSearch = useDebounce(searchQuery, 300);
   const searchParams = useSearchParams();
   const selectedTag = searchParams.get("tag");
@@ -111,15 +113,29 @@ export default function ForumPage() {
       if (sortBy === 'latest') {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       } else {
-        // 热门排序：优先考虑评论数和浏览量
-        const scoreA = a._count.comments * 2 + a.views;
-        const scoreB = b._count.comments * 2 + b.views;
-        return scoreB - scoreA;
+        // 按照浏览量排序
+        return b.views - a.views;
       }
     });
 
     return filteredData;
   }, [selectedTag, debouncedSearch, posts, sortBy]);
+
+  // 计算分页数据
+  const paginatedPosts = useMemo(() => {
+    const startIndex = (currentPage - 1) * postsPerPage;
+    return filteredPosts.slice(startIndex, startIndex + postsPerPage);
+  }, [currentPage, filteredPosts, postsPerPage]);
+
+  // 计算总页数
+  const totalPages = Math.ceil(filteredPosts.length / postsPerPage);
+
+  // 分页处理函数
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // 格式化时间为"X小时前"或"X天前"的形式
   const formatTimeAgo = (dateString: string) => {
@@ -172,17 +188,23 @@ export default function ForumPage() {
                   variant={sortBy === 'latest' ? 'default' : 'ghost'}
                   size="sm"
                   className="h-7 px-2.5"
-                  onClick={() => setSortBy('latest')}
+                  onClick={() => {
+                    setSortBy('latest');
+                    setCurrentPage(1);
+                  }}
                 >
                   最新
                 </Button>
                 <Button
-                  variant={sortBy === 'hot' ? 'default' : 'ghost'}
+                  variant={sortBy === 'views' ? 'default' : 'ghost'}
                   size="sm"
                   className="h-7 px-2.5"
-                  onClick={() => setSortBy('hot')}
+                  onClick={() => {
+                    setSortBy('views');
+                    setCurrentPage(1);
+                  }}
                 >
-                  热门
+                  最多浏览
                 </Button>
               </div>
             </div>
@@ -210,8 +232,8 @@ export default function ForumPage() {
               <div className="text-lg mb-3">加载中...</div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredPosts.map((post) => (
+            <div className="space-y-2">
+              {paginatedPosts.map((post) => (
                 <QuestionCard 
                   key={post.id} 
                   id={post.id}
@@ -237,33 +259,81 @@ export default function ForumPage() {
             </div>
           )}
 
-          {/* 分页 - 移动端优化 */}
-          {filteredPosts.length > 0 && (
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+          {/* 分页组件 - 优化 */}
+          {filteredPosts.length > postsPerPage && (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 px-2">
               <div className="text-sm text-muted-foreground">
-                显示 1-{Math.min(10, filteredPosts.length)} 条，共{" "}
+                显示 {(currentPage - 1) * postsPerPage + 1}-{Math.min(currentPage * postsPerPage, filteredPosts.length)} 条，共{" "}
                 {filteredPosts.length} 条
               </div>
               <div className="flex gap-1">
-                <Button variant="outline" size="sm" className="h-8 px-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 px-3"
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                >
                   上一页
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 bg-primary/5"
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={i}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 w-8"
+                      onClick={() => handlePageChange(pageNum)}
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+                {totalPages > 5 && currentPage < totalPages - 2 && (
+                  <>
+                    {currentPage < totalPages - 3 && <span className="px-1">...</span>}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8"
+                      onClick={() => handlePageChange(totalPages)}
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 px-3"
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
                 >
-                  1
-                </Button>
-                <Button variant="outline" size="sm" className="h-8 px-3">
-                  2
-                </Button>
-                <Button variant="outline" size="sm" className="h-8 px-3">
                   下一页
                 </Button>
               </div>
             </div>
           )}
+
+          {/* 发布新帖按钮 - 固定在右下角 */}
+          <Button
+            size="lg"
+            className="fixed bottom-4 right-4 shadow-lg rounded-full w-14 h-14 z-10"
+            asChild
+          >
+            <Link href="/forum/new">+</Link>
+          </Button>
         </main>
 
         {/* 右侧热门标签 - 移动端隐藏 */}

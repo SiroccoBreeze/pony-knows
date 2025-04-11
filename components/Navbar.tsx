@@ -37,6 +37,7 @@ const Navbar = () => {
     { href: "/Manuscript", label: "实施底稿" },
     { href: "/about", label: "关于我们" },
     { href: "/services", label: "服务" },
+    { href: "/services/nextcloud", label: "文件管理" },
     { href: "/contact", label: "联系我们" },
     { href: "/forum", label: "论坛" },
   ];
@@ -108,6 +109,9 @@ const Navbar = () => {
                       </ListItem>
                       <ListItem href="/services/database" title="数据库表结构">
                         查询和浏览数据库表结构信息
+                      </ListItem>
+                      <ListItem href="/services/nextcloud" title="文件管理">
+                        Nextcloud 文件管理系统
                       </ListItem>
                       <ListItem href="/services/consulting" title="咨询服务">
                         专业的技术咨询解决方案

@@ -454,14 +454,14 @@ export default function PostDetailPage() {
         
         {/* 帖子内容区 */}
         <div className={`${toc.length > 0 ? 'lg:w-3/4 lg:ml-auto' : 'w-full'}`}>
-          {/* 帖子标题和标签 */}
-          <div className="mb-6">
-            <div className="flex flex-col space-y-4">
-              {/* 帖子标题 */}
-              <h1 className="text-2xl md:text-3xl font-bold leading-tight">{post?.title}</h1>
+          {/* 合并帖子标题、元数据和内容到一个卡片中 */}
+          <Card className="p-6 md:p-8 shadow-sm border-border/50 overflow-hidden bg-card">
+            {/* 标题和标签 */}
+            <div className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-bold leading-tight text-foreground mb-4">{post?.title}</h1>
               
               {/* 作者信息和帖子元数据 - 更紧凑的设计 */}
-              <div className="flex items-center text-sm text-muted-foreground">
+              <div className="flex items-center text-sm text-muted-foreground border-b border-border/30 pb-4">
                 <Avatar className="h-8 w-8 ring-1 ring-primary/10 mr-3">
                   <AvatarImage src={post?.author.image || ""} alt={post?.author.name} />
                   <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
@@ -473,7 +473,7 @@ export default function PostDetailPage() {
                   <span className="font-medium text-sm text-foreground">{post?.author.name}</span>
                 </div>
                 
-                <div className="flex items-center space-x-4 text-xs">
+                <div className="flex items-center space-x-4 text-xs ml-auto">
                   <span className="flex items-center">
                     <Calendar className="h-3.5 w-3.5 mr-1 opacity-70" />
                     {post && formatDate(post.createdAt)}
@@ -490,15 +490,15 @@ export default function PostDetailPage() {
                   </span>
                 </div>
               </div>
-              
+            
               {/* 标签 */}
               {post?.postTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-1">
+                <div className="flex flex-wrap gap-1.5 mt-4">
                   {post.postTags.map(({ tag }) => (
                     <Badge 
                       key={tag.id} 
                       variant="outline" 
-                      className="text-xs px-2 py-0.5 bg-muted/50"
+                      className="text-xs px-2 py-0.5 bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
                       {tag.name}
                     </Badge>
@@ -506,15 +506,13 @@ export default function PostDetailPage() {
                 </div>
               )}
             </div>
-          </div>
-          
-          {/* 帖子内容 */}
-          <Card className="p-6 md:p-8 shadow-md border-neutral-100 dark:border-neutral-800 overflow-hidden">
+            
+            {/* 帖子内容 */}
             {isLoading ? (
               <div className="animate-pulse space-y-4">
-                <div className="h-4 bg-muted rounded w-3/4"></div>
-                <div className="h-4 bg-muted rounded w-1/2"></div>
-                <div className="h-4 bg-muted rounded w-5/6"></div>
+                <div className="h-4 bg-muted/30 rounded w-3/4"></div>
+                <div className="h-4 bg-muted/30 rounded w-1/2"></div>
+                <div className="h-4 bg-muted/30 rounded w-5/6"></div>
               </div>
             ) : (
               <div ref={contentRef} className="prose prose-neutral dark:prose-invert max-w-none">
@@ -529,7 +527,7 @@ export default function PostDetailPage() {
               <MessageSquare className="h-5 w-5 mr-2 text-primary" />
               评论 ({post?._count.comments || 0})
             </h2>
-            <Card className="p-6 shadow-sm border-neutral-100 dark:border-neutral-800">
+            <Card className="p-6 shadow-sm border-border/50 bg-card">
               <CommentList postId={params.id} />
             </Card>
           </div>

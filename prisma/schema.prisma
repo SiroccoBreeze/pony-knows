@@ -85,14 +85,19 @@ model Post {
 
 // 评论表
 model Comment {
-  id        String   @id @default(uuid())
-  content   String
-  post      Post     @relation(fields: [postId], references: [id])
-  postId    String
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  content         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  author          User     @relation(fields: [authorId], references: [id])
+  authorId        String
+  post            Post     @relation(fields: [postId], references: [id])
+  postId          String
+  parent          Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId        String?
+  replies         Comment[] @relation("CommentReplies")
+  replyToUserId   String?
+  replyToUserName String?
 }
 
 // 标签表
