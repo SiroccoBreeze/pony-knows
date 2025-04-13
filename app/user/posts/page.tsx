@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Pagination } from "@/components/ui/pagination";
+import { isMobileDevice, getPreviewText } from "@/lib/utils";
 
 // 定义帖子类型
 interface Post {
@@ -56,6 +57,7 @@ export default function PostsPage() {
   const [isSessionChecked, setIsSessionChecked] = useState(false);
   const { data: session, status, update: updateSession } = useSession() as { data: ExtendedSession | null; status: string; update: () => Promise<ExtendedSession | null> };
   const router = useRouter();
+  const [isMobile, setIsMobile] = useState(false);
 
   // 从URL获取tab参数和页码
   useEffect(() => {
@@ -69,6 +71,10 @@ export default function PostsPage() {
     if (page) {
       setCurrentPage(parseInt(page));
     }
+  }, []);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
   }, []);
 
   // 首次加载时手动更新session
@@ -221,12 +227,23 @@ export default function PostsPage() {
     <div className="container mx-auto py-8 px-4 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">帖子管理</h1>
-        <Button>
-          <Link href="/forum/new" className="flex items-center gap-2">
-            发布新帖子
-          </Link>
-        </Button>
+        {!isMobile && (
+          <Button>
+            <Link href="/forum/new" className="flex items-center gap-2">
+              发布新帖子
+            </Link>
+          </Button>
+        )}
       </div>
+      
+      {/* 移动端提示 */}
+      {isMobile && (
+        <div className="bg-muted/30 p-4 rounded-lg mb-4">
+          <p className="text-sm text-muted-foreground">
+            移动端仅支持浏览功能，如需编辑或删除帖子请使用桌面端访问。
+          </p>
+        </div>
+      )}
       
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
@@ -260,7 +277,7 @@ export default function PostsPage() {
                   
                   <CardContent>
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {post.content.substring(0, 200)}...
+                      {getPreviewText(post.content, 150)}
                     </p>
                     
                     <div className="flex flex-wrap gap-2 mt-4">
@@ -283,21 +300,29 @@ export default function PostsPage() {
                   
                   <CardFooter className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/forum/edit/${post.id}`}>
-                        <Edit className="h-4 w-4 mr-1" />
-                        编辑
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/forum/post/${post.id}?from=admin`}>
+                      <Link href={`/forum/post/${post.id}`}>
                         <Eye className="h-4 w-4 mr-1" />
                         查看
                       </Link>
                     </Button>
-                    <Button variant="default" size="sm" onClick={() => handleDelete(post.id)}>
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      删除
-                    </Button>
+                    {!isMobile && (
+                      <>
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/forum/edit/${post.id}`}>
+                            <Edit className="h-4 w-4 mr-1" />
+                            编辑
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(post.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          删除
+                        </Button>
+                      </>
+                    )}
                   </CardFooter>
                 </Card>
               ))}

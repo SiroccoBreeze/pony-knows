@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUserStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,18 +9,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
-import { User, Mail, MapPin, Briefcase, Calendar, Globe } from "lucide-react";
+import { User, Mail } from "lucide-react";
+import { isMobileDevice } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { user, updateUser } = useUserStore();
+  const [isMobile, setIsMobile] = useState(false);
   
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
+
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
     bio: user?.bio || "",
-    location: user?.location || "",
-    company: user?.company || "",
-    website: user?.website || "",
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +67,15 @@ export default function ProfilePage() {
         <h1 className="text-2xl font-bold">个人资料</h1>
       </div>
       
+      {/* 移动端提示 */}
+      {isMobile && (
+        <div className="bg-muted/30 p-4 rounded-lg mb-4">
+          <p className="text-sm text-muted-foreground">
+            移动端仅支持浏览功能，如需编辑个人资料请使用桌面端访问。
+          </p>
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 个人信息卡片 */}
         <Card className="md:col-span-1">
@@ -80,132 +92,75 @@ export default function ProfilePage() {
               <h3 className="text-lg font-medium">{user?.name}</h3>
               <p className="text-sm text-muted-foreground">{user?.email}</p>
             </div>
-            <div className="w-full space-y-2">
-              {user?.location && (
-                <div className="flex items-center text-sm">
-                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{user.location}</span>
-                </div>
-              )}
-              {user?.company && (
-                <div className="flex items-center text-sm">
-                  <Briefcase className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span>{user.company}</span>
-                </div>
-              )}
-              {user?.website && (
-                <div className="flex items-center text-sm">
-                  <Globe className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    {user.website}
-                  </a>
-                </div>
-              )}
-            </div>
+            {user?.bio && (
+              <div className="w-full mt-2 p-3 bg-muted/30 rounded-md">
+                <p className="text-sm whitespace-pre-wrap">{user.bio}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
         
-        {/* 编辑表单 */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>编辑个人资料</CardTitle>
-            <CardDescription>更新您的个人信息和简介</CardDescription>
-          </CardHeader>
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">姓名</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
+        {/* 编辑表单 - 在移动端隐藏 */}
+        {!isMobile && (
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>编辑个人资料</CardTitle>
+              <CardDescription>更新您的个人信息和简介</CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">昵称</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        className="pl-10"
+                        placeholder="您的昵称"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">邮箱</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="pl-10"
+                        placeholder="您的邮箱"
+                        disabled
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">个人简介</Label>
+                    <Textarea
+                      id="bio"
+                      name="bio"
+                      value={formData.bio}
                       onChange={handleChange}
-                      className="pl-10"
-                      placeholder="您的姓名"
+                      placeholder="介绍一下自己..."
+                      rows={4}
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">邮箱</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="pl-10"
-                      placeholder="您的邮箱"
-                      disabled
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="location">所在地</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      className="pl-10"
-                      placeholder="城市, 国家"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company">公司/组织</Label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="company"
-                      name="company"
-                      value={formData.company}
-                      onChange={handleChange}
-                      className="pl-10"
-                      placeholder="您的公司或组织"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="website">个人网站</Label>
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="website"
-                      name="website"
-                      value={formData.website}
-                      onChange={handleChange}
-                      className="pl-10"
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="bio">个人简介</Label>
-                  <Textarea
-                    id="bio"
-                    name="bio"
-                    value={formData.bio}
-                    onChange={handleChange}
-                    placeholder="介绍一下自己..."
-                    rows={4}
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "保存中..." : "保存更改"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+              </CardContent>
+              <CardFooter className="flex justify-end">
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "保存中..." : "保存更改"}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
+        )}
       </div>
     </div>
   );

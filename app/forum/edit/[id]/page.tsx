@@ -29,10 +29,11 @@ import { ToastAction } from "@/components/ui/toast";
 import VditorEditor, { VditorEditorRef } from '@/components/editor/VditorEditor';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { cn, isMobileDevice } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Link } from "next/navigation";
 
 // 定义表单验证模式
 const formSchema = z.object({
@@ -82,6 +83,11 @@ export default function PostEditPage({ params }: PostEditPageProps) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
 
   // 获取帖子数据
   React.useEffect(() => {
@@ -387,6 +393,24 @@ export default function PostEditPage({ params }: PostEditPageProps) {
           <Button onClick={() => router.back()}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             返回
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="bg-muted/30 p-4 rounded-lg">
+          <h1 className="text-xl font-bold mb-4">移动端不支持编辑功能</h1>
+          <p className="text-muted-foreground mb-4">
+            为了更好的编辑体验，请使用桌面端访问此页面。
+          </p>
+          <Button asChild>
+            <Link href={`/forum/post/${id}`}>
+              返回帖子详情
+            </Link>
           </Button>
         </div>
       </div>

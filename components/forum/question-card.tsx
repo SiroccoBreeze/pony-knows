@@ -2,13 +2,13 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { MessageSquare, Eye, Clock } from "lucide-react"
 import Link from "next/link"
+import { getPreviewText } from "@/lib/utils"
 
 interface QuestionCardProps {
   id: string
   title: string
   description: string
   tags: string[]
-  votes?: number
   answers: number
   views: number
   timeAgo: string
@@ -23,6 +23,9 @@ export function QuestionCard({
   views,
   timeAgo,
 }: QuestionCardProps) {
+  // 生成预览文本
+  const previewText = getPreviewText(description, 150)
+
   return (
     <Card className="group p-3 transition-all duration-200 hover:shadow-md hover:border-primary/50 hover:bg-muted/50">
       <div className="flex flex-col">
@@ -34,7 +37,7 @@ export function QuestionCard({
             </h3>
           </Link>
           <p className="text-sm text-muted-foreground mt-1 line-clamp-2 group-hover:text-muted-foreground/80">
-            {description}
+            {previewText}
           </p>
           
           <div className="flex flex-wrap items-center justify-between gap-2 mt-3">

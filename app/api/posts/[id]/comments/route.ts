@@ -111,7 +111,7 @@ export async function POST(
     // 验证帖子是否存在
     const post = await prisma.post.findUnique({
       where: { id: postId },
-      select: { id: true }
+      select: { id: true, title: true, authorId: true }
     });
 
     if (!post) {
@@ -125,7 +125,7 @@ export async function POST(
     if (parentId) {
       const parentComment = await prisma.comment.findUnique({
         where: { id: parentId },
-        select: { postId: true }
+        select: { postId: true, authorId: true }
       });
 
       if (!parentComment) {
@@ -166,6 +166,55 @@ export async function POST(
         },
       },
     });
+
+    // 确定通知接收者（根据评论类型）
+    let recipientUserId;
+
+    if (replyToUserId) {
+      // 如果是回复别人的评论，则通知被回复者
+      recipientUserId = replyToUserId;
+    } else if (parentId) {
+      // 如果回复某条评论但没有指定replyToUserId，则获取父评论作者
+      const parentComment = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { authorId: true }
+      });
+      recipientUserId = parentComment?.authorId;
+    } else {
+      // 如果是直接评论帖子，则通知帖子作者
+      recipientUserId = post.authorId;
+    }
+
+    // 发送通知（如果接收者不是自己）
+    if (recipientUserId && recipientUserId !== session.user.id) {
+      try {
+        // 使用服务器内部直接调用函数的方式，而不是通过axios发送HTTP请求
+        const { headers } = request;
+        const protocol = headers.get("x-forwarded-proto") || "http";
+        const host = headers.get("host") || "localhost:3000";
+        const baseUrl = `${protocol}://${host}`;
+
+        // 发送通知请求
+        await fetch(`${baseUrl}/api/comments/notifications`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // 传递认证信息
+            'Cookie': headers.get('cookie') || ''
+          },
+          body: JSON.stringify({
+            commentId: comment.id,
+            postId: post.id,
+            postTitle: post.title,
+            commentContent: content,
+            recipientUserId: recipientUserId
+          })
+        });
+      } catch (notifyError) {
+        console.error("发送评论通知失败:", notifyError);
+        // 通知失败不影响评论创建成功
+      }
+    }
 
     // 在返回的评论对象中添加被回复用户信息
     return NextResponse.json({

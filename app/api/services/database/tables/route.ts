@@ -2,24 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import sql from "mssql";
-
-// 数据库配置
-const sqlConfig = {
-  user: process.env.MSSQL_USER,
-  password: process.env.MSSQL_PASSWORD,
-  database: process.env.MSSQL_DATABASE,
-  server: process.env.MSSQL_SERVER || "localhost",
-  port: parseInt(process.env.MSSQL_PORT || "1433"),
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  },
-  options: {
-    encrypt: true,
-    trustServerCertificate: true
-  }
-};
+import { getDbPool } from "@/lib/db";
 
 // 列信息接口
 interface ColumnInfo {
@@ -34,13 +17,12 @@ interface ColumnInfo {
   description: string;
 }
 
-// 扩展 Session 类型
+// 扩展会话接口
 interface ExtendedSession {
   user?: {
-    id: string;
+    id?: string | null;
     name?: string | null;
     email?: string | null;
-    image?: string | null;
   };
 }
 
@@ -70,8 +52,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // 创建数据库连接池
-    pool = await new sql.ConnectionPool(sqlConfig).connect();
+    // 使用getDbPool获取数据库连接池
+    pool = await getDbPool();
 
     // 构建LIKE查询条件
     let whereClause = "t.is_ms_shipped = 0";

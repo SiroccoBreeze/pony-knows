@@ -9,21 +9,33 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Loader2, Database, Table2, Key, FileText, 
-  AlertCircle, Code, Eye, BookOpen, Copy, Check, Search
+  AlertCircle, Code, Eye, BookOpen, Copy, Check, Search, Code2
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
-import Prism from 'prismjs';
+import 'prismjs';
 import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-plsql';
 import 'prismjs/themes/prism-tomorrow.css';
+import Prism from 'prismjs';
 import { List, AutoSizer } from 'react-virtualized';
 import { useTheme } from "next-themes";
 import axios from "axios";
 import { CopyButton } from "@/components/CopyButton";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
+import { isMobileDevice } from "@/lib/utils";
+import Link from "next/link";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { CodeHighlighter } from "../../components/CodeHighlighter";
 
 // 表/视图结构数据类型定义
 interface DbColumn {
@@ -42,6 +54,8 @@ interface DbTable {
   columns: DbColumn[];
   type: "table" | "view";
   definition?: string; // 添加定义字段，用于存储视图创建脚本
+  createDate: string;
+  modifyDate: string;
 }
 
 // 存储过程/函数数据类型
@@ -61,207 +75,44 @@ interface PaginationInfo {
   totalPages: number;
 }
 
-// 修改代码高亮组件以支持主题和行号，并添加SQL变量识别
-const CodeHighlighter = ({ code }: { code: string }) => {
-  const preRef = useRef<HTMLPreElement>(null);
-  const codeContainerRef = useRef<HTMLDivElement>(null);
-  const { resolvedTheme } = useTheme();
+interface CopyingState {
+  [key: string]: boolean;
+}
 
-  useEffect(() => {
-    // 添加SQL变量规则
-    if (Prism.languages.sql) {
-      // 添加变量标记规则
-      Object.assign(Prism.languages.sql, {
-        'global-variable': {
-          pattern: /@@\w+/g,
-          greedy: true
-        },
-        'variable': {
-          pattern: /@\w+/g,
-          greedy: true
-        }
-      });
-    }
-
-    if (preRef.current) {
-      // 应用代码高亮
-      Prism.highlightElement(preRef.current);
-      
-      // 代码高亮完成后创建行号
-      setTimeout(() => {
-        if (preRef.current && codeContainerRef.current) {
-          // 清除之前可能存在的行号元素
-          const existingLineNumbers = codeContainerRef.current.querySelector('.line-numbers-container');
-          if (existingLineNumbers) {
-            existingLineNumbers.remove();
-          }
-          
-          // 计算代码行数
-          const lines = code.split('\n');
-          const lineCount = lines.length;
-          
-          // 创建行号容器
-          const lineNumbersContainer = document.createElement('div');
-          lineNumbersContainer.className = 'line-numbers-container';
-          lineNumbersContainer.style.position = 'absolute';
-          lineNumbersContainer.style.top = '0';
-          lineNumbersContainer.style.left = '0';
-          lineNumbersContainer.style.width = '2.5em';
-          lineNumbersContainer.style.height = '100%';
-          lineNumbersContainer.style.overflow = 'hidden';
-          lineNumbersContainer.style.borderRight = '1px solid #666';
-          lineNumbersContainer.style.backgroundColor = resolvedTheme === 'dark' ? '#1a1a1a' : '#f0f0f0';
-          lineNumbersContainer.style.paddingTop = '0.4em';
-          
-          // 创建行号内容
-          const lineNumbersContent = document.createElement('div');
-          lineNumbersContent.style.textAlign = 'right';
-          lineNumbersContent.style.paddingRight = '0.4em';
-          lineNumbersContent.style.color = '#888';
-          lineNumbersContent.style.fontSize = '0.85em';
-          lineNumbersContent.style.lineHeight = '1.4';
-          
-          // 生成所有行号
-          for (let i = 1; i <= lineCount; i++) {
-            const lineNumber = document.createElement('div');
-            lineNumber.textContent = i.toString();
-            lineNumber.style.height = '1.4em';
-            lineNumbersContent.appendChild(lineNumber);
-          }
-          
-          lineNumbersContainer.appendChild(lineNumbersContent);
-          codeContainerRef.current.appendChild(lineNumbersContainer);
-          
-          // 同步滚动处理
-          const codeElement = preRef.current;
-          codeElement.addEventListener('scroll', () => {
-            if (lineNumbersContainer) {
-              lineNumbersContainer.scrollTop = codeElement.scrollTop;
-            }
-          });
-        }
-      }, 10);
-    }
-  }, [code, resolvedTheme]);
-
-  const themeClass = useMemo(() => {
-    // 根据主题切换样式类
-    return resolvedTheme === 'dark' ? 'prism-dark' : 'prism-light';
-  }, [resolvedTheme]);
-
-  // 添加自定义样式以覆盖Prism默认样式
-  useEffect(() => {
-    const style = document.createElement('style');
-    // 根据主题设置样式
-    if (resolvedTheme === 'dark') {
-      style.innerHTML = `
-        .prism-dark {
-          background-color: #1a1a1a !important;
-          color: #e0e0e0 !important;
-          position: relative;
-          padding-left: 3em !important;
-          line-height: 1.4;
-          overflow: auto;
-          max-height: 100%;
-          font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
-        }
-        .prism-dark .token.comment { color: #6a9955 !important; }
-        .prism-dark .token.keyword { color: #569cd6 !important; }
-        .prism-dark .token.string { color: #ce9178 !important; }
-        .prism-dark .token.function { color: #dcdcaa !important; }
-        .prism-dark .token.punctuation { color: #d4d4d4 !important; }
-        .prism-dark .token.operator { color: #d4d4d4 !important; }
-        .prism-dark .token.number { color: #b5cea8 !important; }
-        .prism-dark .token.variable { color: #9cdcfe !important; }
-        .prism-dark .token.global-variable { color: #f8c555 !important; font-weight: bold; }
-      `;
-    } else {
-      style.innerHTML = `
-        .prism-light {
-          background-color: #f6f8fa !important;
-          color: #24292e !important;
-          position: relative;
-          padding-left: 3em !important;
-          line-height: 1.4;
-          overflow: auto;
-          max-height: 100%;
-          font-family: 'Consolas', 'Monaco', 'Andale Mono', 'Ubuntu Mono', monospace !important;
-        }
-        .prism-light .token.comment { color: #6a737d !important; }
-        .prism-light .token.keyword { color: #d73a49 !important; }
-        .prism-light .token.string { color: #032f62 !important; }
-        .prism-light .token.function { color: #6f42c1 !important; }
-        .prism-light .token.punctuation { color: #24292e !important; }
-        .prism-light .token.operator { color: #24292e !important; }
-        .prism-light .token.number { color: #005cc5 !important; }
-        .prism-light .token.variable { color: #005cc5 !important; }
-        .prism-light .token.global-variable { color: #e36209 !important; font-weight: bold; }
-      `;
-    }
-    document.head.appendChild(style);
-    
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, [resolvedTheme]);
-
-  return (
-    <div ref={codeContainerRef} className="relative" style={{height: '100%', minHeight: '300px'}}>
-      <pre ref={preRef} className={`language-sql ${themeClass}`} style={{fontSize: '0.9em', maxHeight: '100%', overflow: 'auto', margin: 0, padding: '0.5em 0.5em 0.5em 3em'}}>
-        <code>{code}</code>
-      </pre>
-    </div>
-  );
+// 获取对象类型显示名称
+const getObjectTypeName = (type: string): string => {
+  switch(type) {
+    case "tables": return "表结构";
+    case "views": return "视图";
+    case "procedures": return "存储过程";
+    case "functions": return "函数";
+    case "params": return "参数";
+    default: return "数据库对象";
+  }
 };
 
-// 搜索组件 - 使用内部状态完全隔离
-const SearchBox = ({ onSearch }: { onSearch: (term: string) => void }) => {
-  const [inputValue, setInputValue] = useState("");
-  
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  };
-  
-  const handleSearch = () => {
-    if (inputValue.trim()) {
-      onSearch(inputValue.trim());
-    }
-  };
-  
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSearch();
-    }
-  };
-  
-  return (
-    <div className="mb-2">
-      <div className="flex items-center space-x-1">
-        <Input
-          type="text"
-          placeholder="输入关键词模糊搜索..."
-          value={inputValue}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          className="w-full h-7 text-xs"
-        />
-        <Button 
-          size="sm" 
-          className="h-7 px-2" 
-          onClick={handleSearch}
-        >
-          <Search className="h-3 w-3" />
-        </Button>
-      </div>
-    </div>
-  );
+// 获取当前类型的图标
+const getTypeIcon = (type: string, className: string = "h-4 w-4 mr-2") => {
+  switch(type) {
+    case "tables":
+      return <Table2 className={className} />;
+    case "views":
+      return <Eye className={className} />;
+    case "procedures":
+      return <Code2 className={className} />;
+    case "functions":
+      return <Code2 className={className} />;
+    case "params":
+      return <FileText className={className} />;
+    default:
+      return <Database className={className} />;
+  }
 };
 
 export default function DatabaseStructurePage() {
-  // 数据库对象类型
+  const [copying, setCopying] = useState<CopyingState>({});
+  const [isMobile, setIsMobile] = useState(false);
   const [activeObjectType, setActiveObjectType] = useState<string>("tables");
-  // 所有数据库对象
   const [dbObjects, setDbObjects] = useState<{
     tables: DbTable[];
     views: DbTable[];
@@ -273,98 +124,63 @@ export default function DatabaseStructurePage() {
     procedures: [],
     functions: []
   });
-
-  // 过滤后的显示对象
   const [filteredObjects, setFilteredObjects] = useState<(DbTable | DbRoutine)[]>([]);
-  // 当前选中的对象
   const [activeObject, setActiveObject] = useState<string>("");
-  // 搜索条件
   const [searchTerm, setSearchTerm] = useState<string>("");
   const searchRef = useRef<string>("");
-  // 加载状态
   const [loading, setLoading] = useState<{[key: string]: boolean}>({
     tables: false,
     views: false,
     procedures: false,
-    functions: false
+    functions: false,
+    params: false
   });
-  // 错误信息
-  const [error, setError] = useState<string | null>(null);
-  // 对象已加载标志
   const [objectsLoaded, setObjectsLoaded] = useState<{[key: string]: boolean}>({
     tables: false,
     views: false,
     procedures: false,
-    functions: false
+    functions: false,
+    params: false
   });
-  // 复制按钮状态
-  const [copying, setCopying] = useState<{[key: string]: boolean}>({});
-  // 添加详情加载状态
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
-
-  // 添加分页状态
   const [pagination, setPagination] = useState<{[key: string]: PaginationInfo}>({
     tables: { total: 0, page: 1, pageSize: 20, totalPages: 0 },
     views: { total: 0, page: 1, pageSize: 20, totalPages: 0 },
     procedures: { total: 0, page: 1, pageSize: 20, totalPages: 0 },
-    functions: { total: 0, page: 1, pageSize: 20, totalPages: 0 }
+    functions: { total: 0, page: 1, pageSize: 20, totalPages: 0 },
+    params: { total: 0, page: 1, pageSize: 20, totalPages: 0 }
   });
-  
-  // 加载状态
   const [isLoading, setIsLoading] = useState(false);
-
-  // 添加搜索状态管理
   const [isSearching, setIsSearching] = useState<boolean>(false);
-
-  // 获取对象类型显示名称
-  const getObjectTypeName = (type: string): string => {
-    switch(type) {
-      case "tables": return "表结构";
-      case "views": return "视图";
-      case "procedures": return "存储过程";
-      case "functions": return "函数";
-      default: return "数据库对象";
-    }
-  };
-
-  // 获取当前类型的图标
-  const getTypeIcon = (type: string, className: string = "h-5 w-5") => {
-    switch(type) {
-      case "tables": return <Table2 className={className} />;
-      case "views": return <Eye className={className} />;
-      case "procedures": return <BookOpen className={className} />;
-      case "functions": return <Code className={className} />;
-      default: return <Database className={className} />;
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
   
-  // 加载数据页面函数
+  // 添加参数配置相关的状态和函数
+  const [configParams, setConfigParams] = useState<{
+    id: string;
+    config: string;
+    note: string | null;
+    detail_note: string | null;
+  }[]>([]);
+
+  // 所有 useEffect 和 useCallback 定义
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
+
   const loadPage = useCallback(async (type: string, page: number = 1, searchTerm: string = "") => {
-    if (isLoading) return;
+    if (isLoading || loading[type]) return;
     
     setIsLoading(true);
     setLoading(prev => ({...prev, [type]: true}));
     
     try {
-      // 构建API URL
       let apiUrl = `/api/services/database/${type}?page=${page}&pageSize=20`;
       
-      // 添加搜索条件 - 使用模糊查询参数，不需要在前端处理大小写
       if (searchTerm) {
-        // 使用search参数实现模糊查询
         apiUrl += `&search=${encodeURIComponent(searchTerm)}&ignoreCase=true`;
       }
       
-      // 对于表和视图，第一页或搜索时加载列信息
-      // 对于存储过程和函数，只获取基本信息，详情按需加载
-      const includeColumns = (type === 'tables' || type === 'views') && (page === 1 || searchTerm) ? true : false;
-      if (includeColumns) {
-        apiUrl += `&includeColumns=true`;
-      }
-      
-      // 打印实际API请求URL
-      console.log(`数据库查询API: ${apiUrl}`);
-      
+      console.log(`正在请求API: ${apiUrl}`);
       const response = await fetch(apiUrl);
       
       if (!response.ok) {
@@ -372,7 +188,39 @@ export default function DatabaseStructurePage() {
       }
       
       const data = await response.json();
+      console.log(`API返回数据:`, data);
       
+      if (type === "params") {
+        // 根据返回的数据结构调整处理方式
+        const items = data.params || [];
+        console.log(`参数配置数据:`, items);
+        setConfigParams(items);
+        
+        // 确保分页信息被正确更新
+        if (data.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            [type]: data.pagination
+          }));
+        }
+        
+        // 对于参数配置，只显示ID列表
+        const paramList = items.map((item: {id: string; config: string; note: string | null; detail_note: string | null}) => ({ 
+          id: item.id, 
+          name: item.id 
+        }));
+        
+        if (page === 1) {
+          setFilteredObjects(paramList);
+        } else {
+          // 添加分页逻辑，追加新的数据
+          setFilteredObjects(prev => {
+            const prevIds = new Set(prev.map((p: any) => 'id' in p ? p.id : p.name));
+            const newItems = paramList.filter(p => !prevIds.has(p.id));
+            return [...prev, ...newItems];
+          });
+        }
+      } else {
       // 更新分页信息
       if (data.pagination) {
         setPagination(prev => ({
@@ -385,26 +233,19 @@ export default function DatabaseStructurePage() {
       switch(type) {
         case "tables":
           if (data.tables && Array.isArray(data.tables)) {
-            // 确保数据不重复且类型正确
             const uniqueTables = data.tables.filter((table: DbTable, index: number, self: DbTable[]) =>
               index === self.findIndex((t: DbTable) => t.name === table.name)
             );
             
             if (page === 1) {
-              // 第一页，替换现有数据
               setDbObjects(prev => ({...prev, tables: uniqueTables}));
-              
-              // 如果有数据且未选择对象，选择第一个
               if (uniqueTables.length > 0 && (!activeObject || activeObjectType !== "tables")) {
                 setActiveObject(uniqueTables[0].name);
               }
-              
-              // 更新过滤的表
               if (activeObjectType === "tables") {
                 setFilteredObjects(uniqueTables);
               }
             } else {
-              // 追加数据（确保不重复）
               setDbObjects(prev => {
                 const allTables = [...prev.tables];
                 uniqueTables.forEach((table: DbTable) => {
@@ -415,7 +256,6 @@ export default function DatabaseStructurePage() {
                 return {...prev, tables: allTables};
               });
               
-              // 更新过滤列表
               if (activeObjectType === "tables") {
                 setFilteredObjects(prev => {
                   const newFiltered = [...prev];
@@ -551,27 +391,24 @@ export default function DatabaseStructurePage() {
           }
           break;
       }
-      
-      // 设置已加载标志
-      setObjectsLoaded(prev => ({...prev, [type]: true}));
-      
-      // 搜索完成后重置搜索状态
-      if (searchTerm) {
-        setIsSearching(false);
       }
-      
-    } catch (error) {
-      console.error(`获取${getObjectTypeName(type)}失败:`, error);
-      setError(error instanceof Error ? error.message : "未知错误");
-      setIsSearching(false);
+    } catch (error: any) {
+      console.error("加载数据失败:", error);
+      setError(error.message);
     } finally {
-      setLoading(prev => ({...prev, [type]: false}));
       setIsLoading(false);
+      setLoading(prev => ({...prev, [type]: false}));
+      setObjectsLoaded(prev => ({...prev, [type]: true}));
     }
-  }, [isLoading, activeObject, activeObjectType, getObjectTypeName]);
+  }, [isLoading, loading, activeObjectType]);
 
-  // 获取当前选中对象的数据
   const getActiveObjectData = useCallback(() => {
+    if (!activeObject) return null;
+    
+    if (activeObjectType === "params") {
+      return configParams.find(param => param.id === activeObject);
+    }
+    
     switch(activeObjectType) {
       case "tables":
         return dbObjects.tables.find(t => t.name === activeObject);
@@ -584,9 +421,8 @@ export default function DatabaseStructurePage() {
       default:
         return null;
     }
-  }, [activeObject, activeObjectType, dbObjects]);
+  }, [activeObject, activeObjectType, dbObjects, configParams]);
 
-  // 加载表结构详情
   const loadTableStructure = useCallback(async (tableName: string) => {
     if (!tableName) return;
     
@@ -621,7 +457,6 @@ export default function DatabaseStructurePage() {
     }
   }, [dbObjects.tables]);
 
-  // 处理对象点击事件
   const handleObjectClick = useCallback(async (objectName: string) => {
     // 如果点击同一个对象，不重复处理
     if (activeObject === objectName) return;
@@ -707,7 +542,6 @@ export default function DatabaseStructurePage() {
     }
   }, [activeObject, activeObjectType, dbObjects, loadTableStructure]);
 
-  // 执行搜索
   const handleSearch = useCallback((term: string) => {
     console.log("执行模糊搜索:", term);
     setIsSearching(true);
@@ -715,64 +549,18 @@ export default function DatabaseStructurePage() {
     loadPage(activeObjectType, 1, term);
   }, [activeObjectType, loadPage]);
 
-  // 修改实现视图过滤和搜索的Effect，修复循环请求问题
   useEffect(() => {
-    // 如果搜索条件没有变化，则不重新执行搜索
     if (searchRef.current === searchTerm) return;
-    
-    // 更新搜索引用值，防止重复搜索
     searchRef.current = searchTerm;
-    
-    if (objectsLoaded[activeObjectType]) {
-      setIsSearching(true);
-      
-      // 搜索逻辑 - 实现防抖
-      const timer = setTimeout(() => {
-        const activeObjects = dbObjects[activeObjectType as keyof typeof dbObjects];
-        const filtered = activeObjects.filter((obj: DbTable | DbRoutine) => {
-          // 模糊匹配名称 - 确保不区分大小写
-          const objName = obj.name.toLowerCase();
-          const searchLower = searchTerm.toLowerCase();
-          
-          // 检查名称是否包含搜索词（不区分大小写）
-          return objName.includes(searchLower);
-        });
-        
-        setFilteredObjects(filtered);
-        setIsSearching(false);
-      }, 300); // 设置300ms的防抖延迟
-      
-      return () => clearTimeout(timer);
-    } else {
-      setFilteredObjects([]);
-    }
-  }, [activeObjectType, dbObjects, objectsLoaded, searchTerm]);
-  
-  // 当对象类型变化时重置搜索条件
-  useEffect(() => {
-    // 只有当搜索词非空时才重置，避免不必要的渲染
-    if (searchTerm) {
-      setSearchTerm("");
-      searchRef.current = "";
-    }
-  }, [activeObjectType]);
+  }, [searchTerm, activeObjectType]);
 
-  // 处理加载完成后的状态更新
   useEffect(() => {
     if (!loading[activeObjectType] && isSearching) {
       setIsSearching(false);
     }
   }, [loading, activeObjectType, isSearching]);
 
-  // 修改activeObjectType变化时的处理
   useEffect(() => {
-    // 当切换对象类型时，重置搜索条件
-    if (searchTerm) {
-      setSearchTerm("");
-      searchRef.current = "";
-    }
-    
-    // 如果对象类型已加载，显示对应的过滤对象
     if (objectsLoaded[activeObjectType]) {
       switch(activeObjectType) {
         case "tables":
@@ -787,14 +575,20 @@ export default function DatabaseStructurePage() {
         case "functions":
           setFilteredObjects(dbObjects.functions);
           break;
+        case "params":
+          // 确保参数配置也被设置到筛选列表中
+          const paramList = configParams.map(item => ({ 
+            id: item.id, 
+            name: item.id 
+          }));
+          setFilteredObjects(paramList);
+          break;
       }
     } else if (!loading[activeObjectType] && !isLoading) {
-      // 对象类型未加载，加载第一页数据
       loadPage(activeObjectType, 1);
     }
-  }, [activeObjectType, dbObjects, objectsLoaded, loading, isLoading]);
+  }, [activeObjectType, dbObjects, configParams, objectsLoaded, loading, isLoading, loadPage]);
 
-  // 复制表/视图创建SQL到剪贴板
   const copyCreateSql = async (objectType: string, objectName: string) => {
     let sql = "";
     
@@ -881,7 +675,6 @@ export default function DatabaseStructurePage() {
     }
   };
   
-  // 复制字段的ALTER ADD语句到剪贴板
   const copyAlterAddSql = async (tableName: string, column: DbColumn) => {
     try {
       setCopying({[`${tableName}_${column.columnName}`]: true});
@@ -923,7 +716,6 @@ export default function DatabaseStructurePage() {
     }
   };
 
-  // 优化虚拟列表渲染，修复虚拟列表高度和样式问题
   const renderVirtualList = useCallback(() => {
     const currentPage = pagination[activeObjectType].page;
     const totalPages = pagination[activeObjectType].totalPages;
@@ -969,7 +761,7 @@ export default function DatabaseStructurePage() {
                 height={height}
                 width={width}
                 rowCount={filteredObjects.length}
-                rowHeight={30} // 减小行高
+                rowHeight={30}
                 overscanRowCount={10}
                 rowRenderer={({ index, style, key }: { index: number; key: string; style: React.CSSProperties }) => {
                   const obj = filteredObjects[index];
@@ -980,6 +772,9 @@ export default function DatabaseStructurePage() {
                       key={key || `${activeObjectType}-${obj.name}-${index}`}
                       style={{...style, padding: '0 2px'}}
                     >
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
                       <Button
                         variant={isActive ? "default" : "ghost"}
                         className={`w-full justify-start font-normal text-left group text-xs ${isActive ? 'bg-primary text-primary-foreground' : ''} h-7`}
@@ -991,10 +786,10 @@ export default function DatabaseStructurePage() {
                             {activeObjectType === "views" && <Eye className={`h-3 w-3 inline mr-1 ${isActive ? 'text-primary-foreground' : 'text-green-500'}`} />}
                             {activeObjectType === "procedures" && <BookOpen className={`h-3 w-3 inline mr-1 ${isActive ? 'text-primary-foreground' : 'text-amber-500'}`} />}
                             {activeObjectType === "functions" && <Code className={`h-3 w-3 inline mr-1 ${isActive ? 'text-primary-foreground' : 'text-purple-500'}`} />}
-                            <span className="text-xs">{obj.name}</span>
+                                  <span className="text-xs truncate">{obj.name}</span>
                           </div>
                           <div 
-                            className={`${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 transition-opacity`}
+                                  className={`${isActive ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 transition-opacity ml-1`}
                             onClick={(e) => {
                               e.stopPropagation();
                               copyCreateSql(activeObjectType, obj.name);
@@ -1007,6 +802,12 @@ export default function DatabaseStructurePage() {
                           </div>
                         </div>
                       </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-[300px]">
+                            <p className="text-xs whitespace-normal break-all">{obj.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   );
                 }}
@@ -1039,17 +840,139 @@ export default function DatabaseStructurePage() {
         )}
       </div>
     );
-  }, [activeObject, activeObjectType, filteredObjects, isLoading, loading, pagination, copying, loadPage, searchTerm, handleObjectClick, copyCreateSql, getObjectTypeName]);
+  }, [activeObject, activeObjectType, filteredObjects, isLoading, loading, pagination, copying, loadPage, searchTerm, handleObjectClick, copyCreateSql]);
 
-  // 渲染对象详情面板
   const renderObjectDetails = useCallback(() => {
     const activeData = getActiveObjectData();
     
+    // 参数配置视图
+    if (activeObjectType === "params") {
+      // 如果没有选中参数或找不到选中的参数
+      if (!activeData) {
+        return (
+          <Card className="h-[calc(100vh-8rem)]">
+            <CardHeader className="pb-2 pt-3 px-3">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-base">参数配置</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="p-4 text-center text-muted-foreground py-8">
+                <FileText className="h-6 w-6 mx-auto mb-2" />
+                <p>请从左侧选择一个参数ID</p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      }
+      
+      // 显示选中的单个参数详情，字段名保持英文
+      const param = activeData as {id: string; config: string; note: string | null; detail_note: string | null};
+      
+      return (
+        <Card className="h-[calc(100vh-8rem)]">
+          <CardHeader className="pb-2 pt-3 px-3">
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary" />
+                <CardTitle className="text-base">参数详情：{param.id}</CardTitle>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium mb-1">id</h3>
+                <div className="bg-muted p-2 rounded text-sm">{param.id}</div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium mb-1">config</h3>
+                <div className="bg-muted p-2 rounded text-sm break-all whitespace-pre-wrap">{param.config}</div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium mb-1">note</h3>
+                <div className="bg-muted p-2 rounded text-sm min-h-[40px]">{param.note}</div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium mb-1">detail_note</h3>
+                <div className="bg-muted p-2 rounded text-sm min-h-[60px] whitespace-pre-wrap">{param.detail_note}</div>
+              </div>
+              
+              <div className="pt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      // 步骤1: 先获取YY_CONFIG表结构
+                      const response = await fetch(`/api/services/database/tables/detail?name=YY_CONFIG&includeColumns=true`);
+                      if (!response.ok) {
+                        throw new Error('获取表结构失败');
+                      }
+                      
+                      const data = await response.json();
+                      if (!data.table || !data.table.columns || data.table.columns.length === 0) {
+                        throw new Error('无法获取表结构信息');
+                      }
+                      
+                      // 步骤2: 构建INSERT语句
+                      const columns = data.table.columns.map(col => col.columnName).join(', ');
+                      
+                      // 步骤3: 根据当前参数值构建VALUES部分
+                      const values = data.table.columns.map(col => {
+                        const colName = col.columnName;
+                        // 检查参数是否有此字段的值
+                        if (colName === 'id') {
+                          return `'${param.id}'`;
+                        } else if (colName === 'config') {
+                          return param.config ? `'${param.config.replace(/'/g, "''")}'` : 'NULL';
+                        } else if (colName === 'note') {
+                          return param.note ? `'${param.note.replace(/'/g, "''")}'` : 'NULL';
+                        } else if (colName === 'detail_note') {
+                          return param.detail_note ? `'${param.detail_note.replace(/'/g, "''")}'` : 'NULL';
+                        } else {
+                          // 对于其他未知字段，默认使用NULL
+                          return 'NULL';
+                        }
+                      }).join(', ');
+                      
+                      // 生成完整的INSERT语句
+                      const insertSql = `INSERT INTO YY_CONFIG (${columns}) VALUES (${values});`;
+                      
+                      // 复制到剪贴板
+                      await navigator.clipboard.writeText(insertSql);
+                      toast.success('已复制完整SQL语句到剪贴板');
+                    } catch (error) {
+                      console.error('生成INSERT语句失败:', error);
+                      toast.error(`生成SQL失败: ${error.message}`);
+                      
+                      // 失败后回退到基本INSERT语句
+                      const basicInsertSql = `INSERT INTO YY_CONFIG (id, config, note, detail_note) VALUES ('${param.id}', ${param.config ? `'${param.config.replace(/'/g, "''")}'` : 'NULL'}, ${param.note ? `'${param.note.replace(/'/g, "''")}'` : 'NULL'}, ${param.detail_note ? `'${param.detail_note.replace(/'/g, "''")}'` : 'NULL'});`;
+                      await navigator.clipboard.writeText(basicInsertSql);
+                    }
+                  }}
+                >
+                  复制INSERT语句
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    
     if (!activeData) {
       return (
-        <Card className="border-dashed">
-          <CardContent className="pt-4">
-            <div className="flex flex-col items-center justify-center py-6 text-center">
+        <Card className="border-dashed h-[calc(100vh-8rem)]">
+          <CardContent className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center justify-center text-center">
               <Database className="h-8 w-8 text-muted-foreground mb-2" />
               <h3 className="text-base font-semibold mb-1">暂无数据</h3>
               <p className="text-sm text-muted-foreground">
@@ -1065,7 +988,7 @@ export default function DatabaseStructurePage() {
     if (activeObjectType === "tables") {
       const tableData = activeData as DbTable;
       return (
-        <Card>
+        <Card className="h-[calc(100vh-8rem)]">
           <CardHeader className="pb-2 pt-3 px-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
@@ -1093,7 +1016,7 @@ export default function DatabaseStructurePage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="p-0 border-t">
-              <div className="overflow-auto max-h-[calc(100vh-240px)]">
+              <div className="overflow-auto max-h-[calc(100vh-12rem)]">
                 {detailLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -1187,7 +1110,7 @@ export default function DatabaseStructurePage() {
             : <Code className="h-4 w-4 text-primary" />);
       
       return (
-        <Card className="h-full">
+        <Card className="h-[calc(100vh-8rem)]">
           <CardHeader className="pb-1 pt-2 px-3">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
@@ -1220,14 +1143,14 @@ export default function DatabaseStructurePage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="border-t">
-              <div className="overflow-hidden max-h-[calc(100vh-140px)]">
+              <div className="overflow-hidden max-h-[calc(100vh-10rem)]">
                 {detailLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin mr-2" />
                     <span>加载代码中...</span>
                   </div>
                 ) : routineData.definition ? (
-                  <div className="h-[calc(100vh-140px)]">
+                  <div className="h-[calc(100vh-10rem)]">
                     <CodeHighlighter code={routineData.definition} />
                   </div>
                 ) : (
@@ -1242,124 +1165,225 @@ export default function DatabaseStructurePage() {
         </Card>
       );
     }
-  }, [activeObjectType, getActiveObjectData, copying, copyCreateSql, copyAlterAddSql, detailLoading, getObjectTypeName]);
+  }, [activeObjectType, getActiveObjectData, copying, copyCreateSql, copyAlterAddSql, detailLoading, getObjectTypeName, configParams]);
 
+  const handleCopyClick = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopying((prev: CopyingState) => ({ ...prev, [text]: true }));
+      setTimeout(() => {
+        setCopying((prev: CopyingState) => ({ ...prev, [text]: false }));
+      }, 2000);
+      toast.success('已复制到剪贴板');
+    } catch (err) {
+      toast.error('复制失败');
+    }
+  }, []);
+
+  // 移动端检测
+  if (isMobile) {
   return (
-    <div className="container mx-auto py-0 px-0">
-      <Toaster />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-1">
-        {/* 左侧控制面板 - 调整布局比例减小 */}
-        <div className="lg:col-span-1">
-          <div className="space-y-2">
-            <Card className="overflow-hidden">
-              <CardHeader className="py-1 px-2">
-                <div className="w-full">
-                  {/* 使用自包含搜索组件 */}
-                  <SearchBox onSearch={handleSearch} />
-                  
-                  {/* 对象类型选择 - 调整按钮布局避免内容溢出 */}
-                  <div className="grid grid-cols-4 gap-1">
-                    <Button 
-                      variant={activeObjectType === "tables" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
-                      onClick={() => setActiveObjectType("tables")}
-                    >
-                      <Table2 className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                      <span className="truncate">表</span>
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2 text-foreground">数据库表结构</h1>
+            <p className="text-muted-foreground">移动端暂不支持表结构查看功能，请使用桌面端访问。</p>
+          </div>
+          <div className="bg-muted/30 p-4 rounded-lg">
+            <p className="text-muted-foreground mb-4">
+              为了更好的表结构查看体验，请使用桌面端访问此页面。
+            </p>
+            <Button asChild>
+              <Link href="/">
+                返回首页
+              </Link>
                     </Button>
-                    
-                    <Button 
-                      variant={activeObjectType === "views" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
-                      onClick={() => setActiveObjectType("views")}
-                    >
-                      <Eye className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                      <span className="truncate">视图</span>
-                    </Button>
-                    
-                    <Button 
-                      variant={activeObjectType === "procedures" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
-                      onClick={() => setActiveObjectType("procedures")}
-                      title="存储过程"
-                    >
-                      <BookOpen className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                      <span className="truncate">过程</span>
-                    </Button>
-                    
-                    <Button 
-                      variant={activeObjectType === "functions" ? "default" : "outline"}
-                      className="flex items-center justify-center py-1 px-1 text-[9px] h-6 w-full"
-                      onClick={() => setActiveObjectType("functions")}
-                    >
-                      <Code className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                      <span className="truncate">函数</span>
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-2 pt-0">
-                <div className="space-y-2">
-                  <Button 
-                    onClick={() => loadPage(activeObjectType, 1)} 
-                    disabled={loading[activeObjectType]}
-                    className="w-full h-7 text-xs"
-                    variant={objectsLoaded[activeObjectType] ? "outline" : "default"}
-                  >
-                    {loading[activeObjectType] ? (
-                      <>
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                        <span className="text-xs">加载中...</span>
-                      </>
-                    ) : objectsLoaded[activeObjectType] ? (
-                      <>
-                        {getTypeIcon(activeObjectType, "h-3 w-3 mr-1")}
-                        <span className="text-xs">刷新{getObjectTypeName(activeObjectType)}</span>
-                      </>
-                    ) : (
-                      <>
-                        {getTypeIcon(activeObjectType, "h-3 w-3 mr-1")}
-                        <span className="text-xs">查询{getObjectTypeName(activeObjectType)}</span>
-                      </>
-                    )}
-                  </Button>
-                  
-                  {/* 显示信息 */}
-                  <div className="text-xs text-muted-foreground">
-                    {filteredObjects.length} / {pagination[activeObjectType].total} 个
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* 对象列表 */}
-            {objectsLoaded[activeObjectType] && (
-              <Card className="h-full overflow-hidden">
-                <CardHeader className="pb-1 pt-1 px-3">
-                  <div className="flex items-center">
-                    {getTypeIcon(activeObjectType, "h-3 w-3 mr-1")}
-                    <span className="text-xs font-medium">{getObjectTypeName(activeObjectType)}</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-1">
-                  {renderVirtualList()}
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
-        
-        {/* 右侧详情显示 - 增加宽度比例 */}
-        <div className="lg:col-span-5">
-          {error && (
-            <Alert variant="destructive" className="mb-2">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>获取数据失败</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      </div>
+    );
+  }
+
+  // 桌面端渲染
+  return (
+    <div className="px-4 py-6 w-full">
+      <Toaster />
+      
+      <div className="flex flex-col lg:flex-row gap-4 max-w-screen-2xl mx-auto">
+        {/* 左侧面板 - 保持固定宽度 */}
+        <div className="w-full lg:w-80 xl:w-96 shrink-0 space-y-4">
+          {/* 搜索和类型选择卡片 */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  数据库对象
+                </CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  {filteredObjects.length} / {pagination[activeObjectType].total} 个对象
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* 搜索框和按钮 */}
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSearch(searchTerm);
+              }} className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    type="search"
+                    placeholder="搜索对象..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                  />
+                </div>
+                <Button 
+                  type="submit"
+                  size="sm"
+                  disabled={loading[activeObjectType]}
+                >
+                  查询
+                </Button>
+              </form>
+
+              {/* 对象类型选择 */}
+              <div className="flex gap-2 items-center">
+                <Select
+                  value={activeObjectType}
+                  onValueChange={(value) => {
+                    setActiveObjectType(value);
+                    setActiveObject(""); // 重置选中的对象
+                    setFilteredObjects([]); // 清空过滤列表
+                    
+                    // 无论是否加载过，都重新加载数据，确保切换到参数配置时也能正确加载
+                    loadPage(value, 1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="选择对象类型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem key="tables" value="tables">
+                      <div className="flex items-center gap-2">
+                        <Table2 className="h-4 w-4" />
+                        <span>表结构</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem key="views" value="views">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4" />
+                        <span>视图</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem key="procedures" value="procedures">
+                      <div className="flex items-center gap-2">
+                        <Code2 className="h-4 w-4" />
+                        <span>存储过程</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem key="functions" value="functions">
+                      <div className="flex items-center gap-2">
+                        <Code className="h-4 w-4" />
+                        <span>函数</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem key="params" value="params">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span>参数配置</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* 刷新按钮 */}
+                <Button 
+                  onClick={() => loadPage(activeObjectType, 1)} 
+                  disabled={loading[activeObjectType]}
+                  size="sm"
+                  variant="outline"
+                >
+                  {loading[activeObjectType] ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {getTypeIcon(activeObjectType, "h-4 w-4")}
+                      刷新
+                    </div>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           
+          {/* 对象列表 */}
+          <Card className="flex-1 overflow-hidden shadow-sm">
+            <ScrollArea className="h-[calc(100vh-22rem)]">
+              <div className="space-y-1 p-2">
+                {filteredObjects.map((obj, index) => (
+                  <TooltipProvider key={`tooltip-${obj.id || obj.name}-${index}`}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          key={`${activeObjectType}-${obj.id || obj.name}-${index}`}
+                          variant={activeObject === (obj.id || obj.name) ? "secondary" : "ghost"}
+                          className={`w-full justify-start text-left ${
+                            activeObject === (obj.id || obj.name) ? "bg-secondary" : ""
+                          } hover:bg-secondary/50 transition-colors duration-200`}
+                          onClick={() => handleObjectClick(obj.id || obj.name)}
+                        >
+                          <div className="flex items-center w-full">
+                            {getTypeIcon(activeObjectType)}
+                            <span className="truncate">{obj.id || obj.name}</span>
+                          </div>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-[300px] break-all">
+                        <p className="text-xs">{obj.id || obj.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ))}
+                {filteredObjects.length === 0 && !loading[activeObjectType] && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    未找到对象
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            {/* 添加分页控制 */}
+            {pagination[activeObjectType].totalPages > 1 && (
+              <div className="flex items-center justify-between p-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadPage(activeObjectType, pagination[activeObjectType].page - 1)}
+                  disabled={pagination[activeObjectType].page === 1}
+                >
+                  上一页
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {pagination[activeObjectType].page} / {pagination[activeObjectType].totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadPage(activeObjectType, pagination[activeObjectType].page + 1)}
+                  disabled={pagination[activeObjectType].page === pagination[activeObjectType].totalPages}
+                >
+                  下一页
+                </Button>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* 右侧内容面板 - 使用flex-1占据剩余空间 */}
+        <div className="flex-1 min-w-0">
           {renderObjectDetails()}
         </div>
       </div>

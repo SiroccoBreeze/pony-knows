@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { User, FileText, Bookmark, Settings, ChevronRight } from "lucide-react";
+import { User, FileText, Bookmark, Settings, ChevronRight, Bell } from "lucide-react";
 
 interface UserLayoutProps {
   children: React.ReactNode;
@@ -14,6 +14,12 @@ const navItems = [
     title: "个人资料",
     href: "/user/profile",
     icon: User,
+  },
+  {
+    title: "消息中心",
+    href: "/user/messages",
+    icon: Bell,
+    badge: 3,
   },
   {
     title: "帖子管理",
@@ -58,7 +64,12 @@ export default function UserLayout({ children }: UserLayoutProps) {
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
-                    {isActive && <ChevronRight className="h-4 w-4 ml-auto" />}
+                    {item.badge && (
+                      <span className="ml-auto flex items-center justify-center bg-red-500 text-white rounded-full w-5 h-5 text-xs">
+                        {item.badge}
+                      </span>
+                    )}
+                    {isActive && !item.badge && <ChevronRight className="h-4 w-4 ml-auto" />}
                   </Link>
                 );
               })}

@@ -23,6 +23,7 @@ model User {
   image         String?
   posts         Post[]
   comments      Comment[]
+  messages      Message[] // 用户接收的消息
   accounts      Account[]
   sessions      Session[]
   createdAt     DateTime  @default(now())
@@ -77,6 +78,7 @@ model Post {
   comments  Comment[]
   tags      Tag[]       @relation("PostToTag") // 反向关系字段
   postTags  PostToTag[] // 明确反向关系字段
+  messages  Message[]   // 与该帖子相关的消息
   status    String
   views     Int         @default(0) // 浏览量计数
   createdAt DateTime    @default(now())
@@ -120,4 +122,20 @@ model PostToTag {
   updatedAt DateTime @updatedAt
 
   @@id([postId, tagId])
+}
+
+// 消息表
+model Message {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  read      Boolean  @default(false)
+  type      String   // 'reply' 或 'system'
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  postId    String?
+  sender    String?  // 发送者名称
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

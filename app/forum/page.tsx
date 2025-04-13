@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
+import { isMobileDevice } from "@/lib/utils";
 
 // 定义帖子和标签接口
 interface Post {
@@ -47,6 +48,11 @@ export default function ForumPage() {
   const debouncedSearch = useDebounce(searchQuery, 300);
   const searchParams = useSearchParams();
   const selectedTag = searchParams.get("tag");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
 
   // 获取帖子数据
   useEffect(() => {
@@ -177,7 +183,21 @@ export default function ForumPage() {
                 </button>
               )}
             </div>
+            {!isMobile && (
+              <Link href="/forum/new">
+                <Button>发新帖</Button>
+              </Link>
+            )}
           </div>
+
+          {/* 移动端提示 */}
+          {isMobile && (
+            <div className="bg-muted/30 p-4 rounded-lg mb-4">
+              <p className="text-sm text-muted-foreground">
+                移动端仅支持浏览功能，如需发帖请使用桌面端访问。
+              </p>
+            </div>
+          )}
 
           {/* 筛选区域 - 移动端优化 */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-muted/30 p-2 rounded-lg">
@@ -325,15 +345,6 @@ export default function ForumPage() {
               </div>
             </div>
           )}
-
-          {/* 发布新帖按钮 - 固定在右下角 */}
-          <Button
-            size="lg"
-            className="fixed bottom-4 right-4 shadow-lg rounded-full w-14 h-14 z-10"
-            asChild
-          >
-            <Link href="/forum/new">+</Link>
-          </Button>
         </main>
 
         {/* 右侧热门标签 - 移动端隐藏 */}

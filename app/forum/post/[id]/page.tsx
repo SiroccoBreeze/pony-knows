@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,9 @@ import { Card } from "@/components/ui/card";
 import { Eye, MessageSquare, Calendar, List, X } from "lucide-react";
 import Link from "next/link";
 import MarkdownRenderer from "@/components/markdown/markdown-renderer";
-import { toast, Toaster } from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 import CommentList from "@/components/comments/CommentList";
+import { isMobileDevice } from "@/lib/utils";
 
 // 定义帖子接口
 interface Post {
@@ -46,7 +47,6 @@ interface TocItem {
 
 export default function PostDetailPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const [post, setPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -54,6 +54,11 @@ export default function PostDetailPage() {
   const [showToc, setShowToc] = useState(false);
   const [activeHeading, setActiveHeading] = useState<string>("");
   const contentRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
 
   // 获取帖子详情
   useEffect(() => {
@@ -318,29 +323,6 @@ export default function PostDetailPage() {
             <Button variant="outline" asChild>
               <Link href="/forum/new">发布新帖</Link>
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/markdown-test">查看Markdown测试页</Link>
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={async () => {
-                try {
-                  const response = await fetch('/api/debug/test-post');
-                  const data = await response.json();
-                  if (data.success) {
-                    toast.success("测试帖子创建成功!");
-                    router.push(data.post.url);
-                  } else {
-                    toast.error(`创建失败: ${data.error}`);
-                  }
-                } catch (err) {
-                  console.error("测试帖子创建失败:", err);
-                  toast.error("创建测试帖子时发生错误");
-                }
-              }}
-            >
-              创建测试帖子
-            </Button>
           </div>
         </div>
       </div>
@@ -351,12 +333,21 @@ export default function PostDetailPage() {
     <div className="container mx-auto py-8 px-4">
       <Toaster position="top-center" />
       
+      {/* 移动端提示 */}
+      {isMobile && (
+        <div className="bg-muted/30 p-4 rounded-lg mb-4">
+          <p className="text-sm text-muted-foreground">
+            移动端仅支持浏览功能，如需回复或编辑请使用桌面端访问。
+          </p>
+        </div>
+      )}
+
       {/* 重新设计布局，确保目录固定且滚动正确 */}
       <div className="flex flex-col lg:flex-row gap-8">
         {/* 目录区 - 桌面版固定在左侧 */}
         {toc.length > 0 && (
-          <aside className="lg:block hidden lg:w-1/4">
-            <div className="fixed overflow-auto pr-4 w-[calc(25%-2rem)]" style={{ maxHeight: 'calc(100vh - 150px)', top: "100px" }}>
+          <aside className="lg:block hidden lg:w-1/5">
+            <div className="fixed overflow-auto pr-4 w-[calc(20%-2rem)]" style={{ maxHeight: 'calc(100vh - 150px)', top: "100px" }}>
               <Card className="p-4 shadow-sm border-neutral-100 dark:border-neutral-800 bg-card/50 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium flex items-center text-primary">
@@ -453,7 +444,7 @@ export default function PostDetailPage() {
         )}
         
         {/* 帖子内容区 */}
-        <div className={`${toc.length > 0 ? 'lg:w-3/4 lg:ml-auto' : 'w-full'}`}>
+        <div className={`${toc.length > 0 ? 'lg:w-4/5 lg:ml-auto' : 'w-full'}`}>
           {/* 合并帖子标题、元数据和内容到一个卡片中 */}
           <Card className="p-6 md:p-8 shadow-sm border-border/50 overflow-hidden bg-card">
             {/* 标题和标签 */}
