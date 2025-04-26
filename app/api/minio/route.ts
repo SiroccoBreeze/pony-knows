@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { nextcloudService } from '@/lib/nextcloud';
+import { minioService } from '@/lib/minio';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const path = searchParams.get('path') || '/';
     
-    const files = await nextcloudService.listFiles(path);
+    const files = await minioService.listFiles(path);
     return NextResponse.json(files);
   } catch (error) {
-    console.error('Error in Nextcloud API:', error);
+    console.error('Error in MinIO API:', error);
     return NextResponse.json(
       { error: 'Failed to fetch files' },
       { status: 500 }
@@ -30,10 +30,10 @@ export async function POST(request: Request) {
       );
     }
 
-    await nextcloudService.uploadFile(file, path);
+    await minioService.uploadFile(file, path);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in Nextcloud API:', error);
+    console.error('Error in MinIO API:', error);
     return NextResponse.json(
       { error: 'Failed to upload file' },
       { status: 500 }

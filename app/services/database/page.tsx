@@ -716,6 +716,59 @@ export default function DatabaseStructurePage() {
     }
   };
 
+  // 复制表结构到剪贴板
+  const copyTableStructure = async (table: DbTable) => {
+    try {
+      setCopying({[`structure_${table.name}`]: true});
+      
+      // 生成表结构文本
+      let structureText = `表名: ${table.name}\n`;
+      structureText += `创建时间: ${new Date(table.createDate).toLocaleString()}\n`;
+      structureText += `修改时间: ${new Date(table.modifyDate).toLocaleString()}\n\n`;
+      structureText += "字段列表:\n";
+      
+      // 表头
+      structureText += "字段名称\t数据类型\t长度\t小数位\t允许NULL\t默认值\t字段说明\n";
+      structureText += "--------------------------------------------------------------\n";
+      
+      // 表内容
+      if (table.columns && table.columns.length > 0) {
+        table.columns.forEach(column => {
+          structureText += `${column.columnName}\t`;
+          structureText += `${column.dataType}\t`;
+          structureText += `${column.columnLength !== null ? column.columnLength : '-'}\t`;
+          structureText += `${column.decimalPlaces !== null ? column.decimalPlaces : '-'}\t`;
+          structureText += `${column.isNullable ? '是' : '否'}\t`;
+          structureText += `${column.defaultValue || '-'}\t`;
+          structureText += `${column.description || '-'}\n`;
+        });
+      }
+      
+      // 尝试使用现代API
+      try {
+        await navigator.clipboard.writeText(structureText);
+      } catch {
+        // 兼容性方案：创建一个临时文本区域来复制
+        const textArea = document.createElement('textarea');
+        textArea.value = structureText;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      
+      toast.success(`已复制 ${table.name} 的表结构到剪贴板`);
+    } catch (error) {
+      console.error("复制失败:", error);
+      toast.error("复制失败: " + (error instanceof Error ? error.message : "未知错误"));
+    } finally {
+      // 延迟清除复制状态，给用户更多视觉反馈
+      setTimeout(() => {
+        setCopying({});
+      }, 1000);
+    }
+  };
+
   const renderVirtualList = useCallback(() => {
     const currentPage = pagination[activeObjectType].page;
     const totalPages = pagination[activeObjectType].totalPages;
@@ -1001,9 +1054,10 @@ export default function DatabaseStructurePage() {
                     {tableData.columns?.length || 0} 列
                   </Badge>
                   <button 
-                    className="p-1 rounded hover:bg-muted transition-colors"
+                    className="p-1 rounded hover:bg-muted transition-colors flex items-center gap-1"
                     onClick={() => copyCreateSql(activeObjectType, tableData.name)}
                     disabled={!!copying[tableData.name]}
+                    title="复制CREATE TABLE语句"
                   >
                     {copying[tableData.name] ? 
                       <Check className="h-3 w-3 text-green-500" /> : 
@@ -1165,7 +1219,7 @@ export default function DatabaseStructurePage() {
         </Card>
       );
     }
-  }, [activeObjectType, getActiveObjectData, copying, copyCreateSql, copyAlterAddSql, detailLoading, getObjectTypeName, configParams]);
+  }, [activeObjectType, getActiveObjectData, copying, copyCreateSql, copyAlterAddSql, copyTableStructure, detailLoading, getObjectTypeName, configParams]);
 
   const handleCopyClick = useCallback(async (text: string) => {
     try {

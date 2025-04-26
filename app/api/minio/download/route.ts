@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { nextcloudService } from '@/lib/nextcloud';
+import { minioService } from '@/lib/minio';
 
 export async function GET(request: Request) {
   try {
@@ -13,21 +13,20 @@ export async function GET(request: Request) {
       );
     }
 
-    const fileContent = await nextcloudService.downloadFile(path);
-    const buffer = Buffer.from(fileContent as Buffer);
+    const fileContent = await minioService.downloadFile(path);
     const filename = path.split('/').pop() || 'file';
     
     // 使用 encodeURIComponent 处理中文文件名
     const encodedFilename = encodeURIComponent(filename);
     
-    return new NextResponse(buffer, {
+    return new NextResponse(fileContent, {
       headers: {
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
       },
     });
   } catch (error) {
-    console.error('Error in Nextcloud download API:', error);
+    console.error('Error in MinIO download API:', error);
     return NextResponse.json(
       { error: 'Failed to download file' },
       { status: 500 }

@@ -111,7 +111,26 @@ export default function MessagesPage() {
   // 初始加载消息
   useEffect(() => {
     loadMessages();
-  }, []);
+    
+    // 定时刷新消息状态，确保计数准确
+    const refreshInterval = setInterval(() => {
+      loadMessages(activeTab === "all" ? null : activeTab, pagination.page);
+    }, 30000); // 每30秒刷新一次
+    
+    // 添加事件监听器以响应来自其他页面的消息更新
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'messages-updated') {
+        loadMessages(activeTab === "all" ? null : activeTab, pagination.page);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      clearInterval(refreshInterval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [activeTab, pagination.page]);
   
   // 标记消息为已读
   const markAsRead = async (id: string) => {
@@ -133,6 +152,9 @@ export default function MessagesPage() {
         } else if (updatedMessage.type === "system") {
           setUnreadSystemCount(prev => Math.max(0, prev - 1));
         }
+        
+        // 通知其他组件消息状态已更新
+        localStorage.setItem('messages-updated', Date.now().toString());
       }
     } catch (err) {
       console.error("标记消息已读失败:", err);
@@ -156,6 +178,9 @@ export default function MessagesPage() {
       setUnreadCount(0);
       setUnreadReplyCount(0);
       setUnreadSystemCount(0);
+      
+      // 通知其他组件消息状态已更新
+      localStorage.setItem('messages-updated', Date.now().toString());
       
       toast({
         title: "成功",
@@ -189,6 +214,9 @@ export default function MessagesPage() {
         } else if (deletedMessage.type === "system") {
           setUnreadSystemCount(prev => Math.max(0, prev - 1));
         }
+        
+        // 通知其他组件消息状态已更新
+        localStorage.setItem('messages-updated', Date.now().toString());
       }
       
       toast({
@@ -271,7 +299,12 @@ export default function MessagesPage() {
             您有 {unreadCount} 条未读消息
           </p>
         </div>
-        <Button onClick={markAllAsRead} variant="outline" size="sm">
+        <Button 
+          onClick={markAllAsRead} 
+          variant="outline" 
+          size="sm"
+          disabled={unreadCount === 0}
+        >
           <CheckCheck className="h-4 w-4 mr-2" />
           全部标为已读
         </Button>
@@ -365,7 +398,10 @@ export default function MessagesPage() {
                             <Link 
                               href={message.link} 
                               className="text-xs text-primary hover:underline"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead(message.id);
+                              }}
                             >
                               查看详情
                             </Link>
@@ -475,7 +511,10 @@ export default function MessagesPage() {
                             <Link 
                               href={message.link} 
                               className="text-xs text-primary hover:underline"
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead(message.id);
+                              }}
                             >
                               查看详情
                             </Link>

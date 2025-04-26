@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { nextcloudService } from '@/lib/nextcloud';
+import { minioService } from '@/lib/minio';
 
 export async function DELETE(request: Request) {
   try {
@@ -13,10 +13,10 @@ export async function DELETE(request: Request) {
       );
     }
 
-    await nextcloudService.delete(path);
+    await minioService.delete(path);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error in Nextcloud delete API:', error);
+    console.error('Error in MinIO delete API:', error);
     return NextResponse.json(
       { error: 'Failed to delete file' },
       { status: 500 }

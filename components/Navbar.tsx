@@ -22,23 +22,90 @@ import { Menu, Bell } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import axios from "axios";
+
+// 通知项目类型
+interface NotificationItem {
+  id: string;
+  title: string;
+  content: string;
+  time: string;
+}
 
 const Navbar = () => {
   const { user, isLoggedIn } = useUserStore();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   
   // 确保组件只在客户端渲染后显示
   useEffect(() => {
     setMounted(true);
   }, []);
+  
+  // 获取未读消息数
+  useEffect(() => {
+    if (isLoggedIn && mounted) {
+      const fetchUnreadMessages = async () => {
+        try {
+          const response = await axios.get("/api/user/messages/unread");
+          if (response.data && response.data.unreadCount !== undefined) {
+            setUnreadCount(response.data.unreadCount);
+            setNotificationItems(response.data.recentMessages || []);
+          }
+        } catch (error) {
+          console.error("获取未读消息数失败:", error);
+        }
+      };
+      
+      fetchUnreadMessages();
+      
+      // 设置定时器，每分钟刷新一次未读消息数
+      const intervalId = setInterval(fetchUnreadMessages, 60000);
+      
+      // 监听localStorage变化，以便在消息状态更新时刷新
+      const handleStorageChange = (e: StorageEvent) => {
+        if (e.key === 'messages-updated') {
+          fetchUnreadMessages();
+        }
+      };
+      
+      window.addEventListener('storage', handleStorageChange);
+      
+      // 也监听直接在当前窗口中的变化
+      const handleLocalUpdate = () => {
+        const checkForUpdates = () => {
+          const lastUpdate = localStorage.getItem('messages-updated');
+          if (lastUpdate && lastUpdate !== lastCheckedUpdate.current) {
+            lastCheckedUpdate.current = lastUpdate;
+            fetchUnreadMessages();
+          }
+        };
+        
+        const localUpdateInterval = setInterval(checkForUpdates, 1000);
+        return () => clearInterval(localUpdateInterval);
+      };
+      
+      const localUpdateCleanup = handleLocalUpdate();
+      
+      return () => {
+        clearInterval(intervalId);
+        window.removeEventListener('storage', handleStorageChange);
+        localUpdateCleanup();
+      };
+    }
+  }, [isLoggedIn, mounted]);
+  
+  // 用于跟踪最后检查的更新时间
+  const lastCheckedUpdate = React.useRef<string | null>(null);
 
   // 移动端导航菜单项
   const mobileNavItems = [
     { href: "/", label: "首页" },
     { href: "/Manuscript", label: "实施底稿" },
     { href: "/services", label: "服务" },
-    { href: "/services/nextcloud", label: "网盘服务" },
+    { href: "/services/minio", label: "网盘服务" },
     { href: "/forum", label: "论坛" },
   ];
 
@@ -81,8 +148,8 @@ const Navbar = () => {
                       <ListItem href="/services/database" title="数据库结构">
                         查询和浏览数据库表结构信息
                       </ListItem>
-                      <ListItem href="/services/nextcloud" title="网盘服务">
-                        Nextcloud 网盘服务系统
+                      <ListItem href="/services/minio" title="网盘服务">
+                        基于MinIO的对象存储服务
                       </ListItem>
                     </ul>
                   </NavigationMenuContent>
@@ -108,9 +175,11 @@ const Navbar = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5" />
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
-                      3
-                    </Badge>
+                    {unreadCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Badge>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-72">
@@ -122,21 +191,19 @@ const Navbar = () => {
                       </Link>
                     </div>
                     <div className="space-y-2">
-                      <div className="bg-muted/50 p-2 rounded-md text-xs">
-                        <p className="font-medium">有新回复: 《关于数据库结构的疑问》</p>
-                        <p className="text-muted-foreground mt-1">用户小明回复了您的帖子</p>
-                        <p className="text-muted-foreground text-right text-[10px] mt-1">1小时前</p>
-                      </div>
-                      <div className="bg-muted/50 p-2 rounded-md text-xs">
-                        <p className="font-medium">系统通知: 账户安全提醒</p>
-                        <p className="text-muted-foreground mt-1">您的账户已30天未修改密码</p>
-                        <p className="text-muted-foreground text-right text-[10px] mt-1">1天前</p>
-                      </div>
-                      <div className="bg-muted/50 p-2 rounded-md text-xs">
-                        <p className="font-medium">论坛公告: 系统维护通知</p>
-                        <p className="text-muted-foreground mt-1">本周六凌晨2点-4点系统将进行维护</p>
-                        <p className="text-muted-foreground text-right text-[10px] mt-1">2天前</p>
-                      </div>
+                      {notificationItems.length > 0 ? (
+                        notificationItems.map((item: NotificationItem) => (
+                          <div key={item.id} className="bg-muted/50 p-2 rounded-md text-xs">
+                            <p className="font-medium">{item.title}</p>
+                            <p className="text-muted-foreground mt-1">{item.content}</p>
+                            <p className="text-muted-foreground text-right text-[10px] mt-1">{item.time}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-2 text-xs text-muted-foreground">
+                          暂无未读消息
+                        </div>
+                      )}
                     </div>
                     <Link 
                       href="/user/messages" 
