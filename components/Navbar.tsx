@@ -125,18 +125,18 @@ const Navbar = () => {
             <NavigationMenu>
               <NavigationMenuList>
                 <NavigationMenuItem>
-                  <Link href="/" legacyBehavior passHref>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild>
+                    <Link href="/" className={navigationMenuTriggerStyle()}>
                       首页
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
-                  <Link href="/Manuscript" legacyBehavior passHref>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild>
+                    <Link href="/Manuscript" className={navigationMenuTriggerStyle()}>
                       实施底稿
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
                   <NavigationMenuTrigger>服务</NavigationMenuTrigger>
@@ -156,11 +156,11 @@ const Navbar = () => {
                 </NavigationMenuItem>
 
                 <NavigationMenuItem>
-                  <Link href="/forum" legacyBehavior passHref>
-                    <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                  <NavigationMenuLink asChild>
+                    <Link href="/forum" className={navigationMenuTriggerStyle()}>
                       论坛
-                    </NavigationMenuLink>
-                  </Link>
+                    </Link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
@@ -222,12 +222,12 @@ const Navbar = () => {
               <UserMenu user={user!} />
             ) : (
               <>
-                <Link href="/auth/login">
-                  <Button variant="outline">登录</Button>
-                </Link>
-                <Link href="/auth/register">
-                  <Button>注册</Button>
-                </Link>
+                <Button variant="outline" asChild>
+                  <Link href="/auth/login">登录</Link>
+                </Button>
+                <Button asChild>
+                  <Link href="/auth/register">注册</Link>
+                </Button>
               </>
             )}
           </div>

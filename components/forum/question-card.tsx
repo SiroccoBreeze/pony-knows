@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card"
 import { MessageSquare, Eye, Clock } from "lucide-react"
 import Link from "next/link"
 import { getPreviewText } from "@/lib/utils"
+import { ReactNode } from "react"
 
 interface QuestionCardProps {
   id: string
@@ -12,6 +13,7 @@ interface QuestionCardProps {
   answers: number
   views: number
   timeAgo: string
+  children?: ReactNode
 }
 
 export function QuestionCard({
@@ -22,6 +24,7 @@ export function QuestionCard({
   answers,
   views,
   timeAgo,
+  children
 }: QuestionCardProps) {
   // 生成预览文本
   const previewText = getPreviewText(description, 150)
@@ -31,7 +34,10 @@ export function QuestionCard({
       <div className="flex flex-col">
         {/* 问题标题和内容 */}
         <div className="flex-1 min-w-0">
-          <Link href={`/forum/post/${id}`} className="block group-hover:text-primary transition-colors">
+          <Link
+            href={`/forum/post/${id}`}
+            className="block group-hover:text-primary transition-colors"
+            legacyBehavior>
             <h3 className="text-base font-semibold line-clamp-1">
               {title}
             </h3>
@@ -43,13 +49,8 @@ export function QuestionCard({
           <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
             <div className="flex flex-wrap gap-1">
               {tags.map((tag) => (
-                <Link key={tag} href={`/forum?tag=${tag}`}>
-                  <Badge 
-                    variant="secondary" 
-                    className="hover:bg-primary/10 transition-colors hover:text-primary text-xs px-2 py-0"
-                  >
-                    {tag}
-                  </Badge>
+                <Link key={tag} href={`/forum?tag=${tag}`} className="inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                  {tag}
                 </Link>
               ))}
             </div>
@@ -67,10 +68,15 @@ export function QuestionCard({
                 <Clock className="w-3.5 h-3.5" />
                 <span>{timeAgo}</span>
               </div>
+              {children && (
+                <div className="ml-2">
+                  {children}
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
     </Card>
-  )
+  );
 } 

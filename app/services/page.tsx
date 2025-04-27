@@ -10,7 +10,6 @@ export default function ServicesPage() {
     <div className="container mx-auto py-20">
       <h1 className="text-3xl font-bold mb-4">系统服务</h1>
       <p className="text-lg text-muted-foreground mb-10">探索我们提供的数据库服务功能</p>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 max-w-3xl mx-auto">
         {/* 数据库表结构服务 */}
         <Card className="flex flex-col h-full shadow-md hover:shadow-lg transition-shadow">
@@ -42,7 +41,7 @@ export default function ServicesPage() {
             </div>
           </CardContent>
           <CardFooter className="bg-muted/10 pt-4">
-            <Link href="/services/database" className="w-full">
+            <Link href="/services/database" className="w-full" legacyBehavior>
               <Button className="w-full">查看表结构</Button>
             </Link>
           </CardFooter>

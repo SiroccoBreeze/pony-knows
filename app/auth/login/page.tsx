@@ -36,7 +36,7 @@ export default function LoginPage() {
         
         <div className="relative z-20 flex flex-col justify-between w-full h-full p-12 text-white">
           <div>
-            <Link href="/" className="flex items-center gap-2 text-white">
+            <Link href="/" className="flex items-center gap-2 text-white" legacyBehavior>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -103,12 +103,11 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      
       {/* 右侧登录表单 */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 lg:p-24">
         <div className="w-full max-w-md space-y-8">
           <div className="lg:hidden flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2" legacyBehavior>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -123,7 +122,7 @@ export default function LoginPage() {
               </svg>
               <span className="text-lg font-bold">PonyKnows</span>
             </Link>
-            <Link href="/">
+            <Link href="/" legacyBehavior>
               <Button variant="ghost" size="sm" className="flex items-center gap-1">
                 <ArrowLeft className="h-4 w-4" />
                 返回

@@ -120,7 +120,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
-
       {/* 移动端菜单 */}
       <AnimatePresence>
         {isMobileMenuOpen && (
@@ -140,7 +139,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                   const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
                     <li key={item.href}>
-                      <Link 
+                      <Link
                         href={item.href}
                         className={cn(
                           "flex items-center px-4 py-3 rounded-md transition-all",
@@ -148,7 +147,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                             ? "bg-primary/10 text-primary font-medium" 
                             : "hover:bg-muted"
                         )}
-                      >
+                        legacyBehavior>
                         <span className={cn(
                           "mr-3",
                           isActive ? "text-primary" : "text-muted-foreground"
@@ -175,7 +174,6 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           </motion.div>
         )}
       </AnimatePresence>
-
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* 桌面侧边栏 - 只在md以上显示 */}
         <div className="hidden md:block col-span-1">
@@ -195,7 +193,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                       whileHover={{ x: 2 }}
                       transition={{ type: "spring", stiffness: 400, damping: 10 }}
                     >
-                      <Link 
+                      <Link
                         href={item.href}
                         className={cn(
                           "flex items-center px-4 py-3 rounded-md transition-all",
@@ -203,7 +201,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                             ? "bg-primary/10 text-primary font-medium" 
                             : "hover:bg-muted"
                         )}
-                      >
+                        legacyBehavior>
                         <span className={cn(
                           "mr-3",
                           isActive ? "text-primary" : "text-muted-foreground"

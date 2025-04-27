@@ -89,7 +89,6 @@ export default function BookmarksPage() {
           />
         </div>
       </div>
-      
       {filteredBookmarks.length === 0 ? (
         <div className="text-center py-12">
           <Bookmark className="h-12 w-12 mx-auto text-muted-foreground opacity-20" />
@@ -109,7 +108,10 @@ export default function BookmarksPage() {
               <CardHeader className="pb-2">
                 <div className="flex justify-between">
                   <CardTitle className="text-lg">
-                    <Link href={`/forum/post/${bookmark.id}`} className="hover:underline">
+                    <Link
+                      href={`/forum/post/${bookmark.id}`}
+                      className="hover:underline"
+                      legacyBehavior>
                       {bookmark.title}
                     </Link>
                   </CardTitle>
@@ -119,7 +121,10 @@ export default function BookmarksPage() {
                 </div>
                 <CardDescription className="flex items-center mt-1">
                   <User className="h-3 w-3 mr-1" />
-                  <Link href={`/user/${bookmark.authorId}`} className="hover:underline">
+                  <Link
+                    href={`/user/${bookmark.authorId}`}
+                    className="hover:underline"
+                    legacyBehavior>
                     {bookmark.author}
                   </Link>
                   <span className="mx-2">•</span>
@@ -148,7 +153,7 @@ export default function BookmarksPage() {
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/forum/post/${bookmark.id}`}>
+                  <Link href={`/forum/post/${bookmark.id}`} legacyBehavior>
                     <Eye className="h-4 w-4 mr-1" />
                     查看
                   </Link>

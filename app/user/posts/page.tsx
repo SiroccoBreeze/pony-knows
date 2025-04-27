@@ -235,7 +235,6 @@ export default function PostsPage() {
           </Button>
         )}
       </div>
-      
       {/* 移动端提示 */}
       {isMobile && (
         <div className="bg-muted/30 p-4 rounded-lg mb-4">
@@ -244,7 +243,6 @@ export default function PostsPage() {
           </p>
         </div>
       )}
-      
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="published">已发布</TabsTrigger>
@@ -300,7 +298,7 @@ export default function PostsPage() {
                   
                   <CardFooter className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/forum/post/${post.id}`}>
+                      <Link href={`/forum/post/${post.id}`} legacyBehavior>
                         <Eye className="h-4 w-4 mr-1" />
                         查看
                       </Link>
@@ -308,7 +306,7 @@ export default function PostsPage() {
                     {!isMobile && (
                       <>
                         <Button variant="outline" size="sm" asChild>
-                          <Link href={`/forum/edit/${post.id}`}>
+                          <Link href={`/forum/edit/${post.id}`} legacyBehavior>
                             <Edit className="h-4 w-4 mr-1" />
                             编辑
                           </Link>

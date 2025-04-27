@@ -64,9 +64,19 @@ export default function ForumPage() {
           throw new Error('获取帖子失败');
         }
         const data = await response.json();
-        setPosts(data);
+        
+        // 确保设置的是有效的数组数据
+        if (Array.isArray(data)) {
+          setPosts(data);
+        } else if (data && Array.isArray(data.posts)) {
+          setPosts(data.posts);
+        } else {
+          console.error('API返回了无效的数据格式', data);
+          setPosts([]);
+        }
       } catch (error) {
         console.error('获取帖子数据失败:', error);
+        setPosts([]);
       } finally {
         setIsLoading(false);
       }
@@ -95,7 +105,8 @@ export default function ForumPage() {
 
   // 使用 useMemo 优化过滤和排序逻辑
   const filteredPosts = useMemo(() => {
-    let filteredData = posts;
+    // 确保posts是一个数组
+    let filteredData = Array.isArray(posts) ? posts : [];
 
     // 先按标签筛选
     if (selectedTag) {
@@ -115,14 +126,16 @@ export default function ForumPage() {
     }
 
     // 根据排序方式排序
-    filteredData = [...filteredData].sort((a, b) => {
-      if (sortBy === 'latest') {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      } else {
-        // 按照浏览量排序
-        return b.views - a.views;
-      }
-    });
+    if (filteredData.length > 0) {
+      filteredData = [...filteredData].sort((a, b) => {
+        if (sortBy === 'latest') {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        } else {
+          // 按照浏览量排序
+          return b.views - a.views;
+        }
+      });
+    }
 
     return filteredData;
   }, [selectedTag, debouncedSearch, posts, sortBy]);
@@ -184,9 +197,11 @@ export default function ForumPage() {
               )}
             </div>
             {!isMobile && (
-              <Link href="/forum/new">
-                <Button>发新帖</Button>
-              </Link>
+              <Button asChild variant="default" className="flex gap-2 rounded-lg">
+                <Link href="/forum/new">
+                  <span>发布新帖</span>
+                </Link>
+              </Button>
             )}
           </div>
 
@@ -264,7 +279,11 @@ export default function ForumPage() {
                   answers={post._count.comments}
                   views={post.views}
                   timeAgo={formatTimeAgo(post.createdAt)}
-                />
+                >
+                  <Button asChild variant="ghost" className="h-8 w-8 p-0">
+                    <Link href={`/forum/post/${post.id}`}><Search className="h-4 w-4" /></Link>
+                  </Button>
+                </QuestionCard>
               ))}
 
               {filteredPosts.length === 0 && (

@@ -1,0 +1,18 @@
+# 数据库设置
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ponyknows"
+
+# NextAuth 配置
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-super-secret-key-please-change-in-production"
+
+# 管理员账户信息
+ADMIN_EMAIL="admin@example.com"
+ADMIN_PASSWORD="admin123456"
+
+# MinIO 对象存储配置
+MINIO_ENDPOINT="localhost"
+MINIO_PORT="9000"
+MINIO_ACCESS_KEY="minioadmin"
+MINIO_SECRET_KEY="minioadmin"
+MINIO_USESSL="false"
+MINIO_BUCKET="ponyknows" 

@@ -54,7 +54,10 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/user/profile" className="flex items-center cursor-pointer">
+          <Link
+            href="/user/profile"
+            className="flex items-center cursor-pointer"
+            legacyBehavior>
             <Settings className="mr-2 h-4 w-4" />
             <span>用户管理</span>
           </Link>

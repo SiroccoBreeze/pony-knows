@@ -169,7 +169,11 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
           
           if (isInternal) {
             return (
-              <Link href={href || '#'} className="text-primary hover:underline" {...props}>
+              <Link
+                href={href || '#'}
+                className="text-primary hover:underline"
+                {...props}
+                legacyBehavior>
                 {children}
               </Link>
             );

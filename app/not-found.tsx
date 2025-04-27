@@ -22,7 +22,7 @@ export default function NotFound() {
         {/* 操作按钮 */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
           <Button asChild variant="default" size="lg" className="gap-2">
-            <Link href="/">
+            <Link href="/" legacyBehavior>
               <Home className="h-4 w-4" />
               返回首页
             </Link>
@@ -37,5 +37,5 @@ export default function NotFound() {
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-20"></div>
       </div>
     </div>
-  )
+  );
 } 

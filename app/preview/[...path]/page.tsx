@@ -6,19 +6,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import jschardet from 'jschardet';
 import { Button } from '@/components/ui/button';
-import { Download, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, AlertCircle, ExternalLink } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import dynamic from 'next/dynamic';
-
-// 使用动态导入加载Office Web Viewer组件，避免服务器端渲染问题
-const OfficeWebViewer = dynamic(
-  () => import('@/components/OfficeWebViewer').then(mod => mod.OfficeWebViewer),
-  { ssr: false, loading: () => (
-    <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-gray-300 dark:border-gray-600 border-t-primary"></div>
-    </div>
-  )}
-);
 
 export default function FilePreview() {
   const params = useParams();
@@ -29,8 +18,6 @@ export default function FilePreview() {
   const [fileType, setFileType] = useState<'image' | 'text' | 'pdf' | 'code' | 'office' | 'other'>('text');
   const [fileName, setFileName] = useState<string>('');
   const [fileBlob, setFileBlob] = useState<Blob | null>(null);
-  const [officeViewerFailed, setOfficeViewerFailed] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [publicFileUrl, setPublicFileUrl] = useState<string>('');
 
   // 获取完整路径
@@ -128,18 +115,6 @@ export default function FilePreview() {
     }
   };
 
-  // Office Viewer加载失败处理
-  const handleOfficeViewerError = () => {
-    console.error('Office文档查看器加载失败');
-    setOfficeViewerFailed(true);
-  };
-
-  // 重试加载Office文档
-  const handleRetryOfficeViewer = () => {
-    setOfficeViewerFailed(false);
-    setRetryCount(prev => prev + 1);
-  };
-
   // 获取文件内容和公开URL
   useEffect(() => {
     if (!decodedPath) return;
@@ -148,7 +123,6 @@ export default function FilePreview() {
       try {
         setIsLoading(true);
         setError(null);
-        setOfficeViewerFailed(false);
         
         // 获取文件名
         const pathParts = decodedPath.split('/');
@@ -198,149 +172,124 @@ export default function FilePreview() {
     };
 
     fetchFile();
-  }, [decodedPath, retryCount]);
+  }, [decodedPath]);
 
-  // 渲染页面
+  // 渲染内容
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-gray-50 dark:bg-gray-900">
-      {/* 最小化的文件信息栏 */}
-      <div className="flex justify-between items-center px-4 py-2 bg-white dark:bg-gray-800 shadow-sm">
-        <div className="flex items-center space-x-2 overflow-hidden">
-          <span className="text-xl">{getFileIcon()}</span>
-          <h1 className="text-base font-medium truncate max-w-[calc(100vw-120px)]">{fileName}</h1>
+    <main className="container mx-auto py-6 px-4 min-h-screen">
+      {/* 文件标题和下载按钮 */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-2">
+          <span className="text-3xl">{getFileIcon()}</span>
+          <h1 className="text-xl font-semibold truncate max-w-[70%]">{fileName}</h1>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleDownload} 
-          disabled={!fileBlob}
-          className="ml-2 hover:bg-gray-100 dark:hover:bg-gray-700"
-        >
-          <Download className="h-4 w-4 mr-1" />
-          <span className="text-xs">下载</span>
+        <Button onClick={handleDownload} variant="secondary" size="sm" className="flex items-center gap-1">
+          <Download className="w-4 h-4" />
+          <span>下载</span>
         </Button>
       </div>
 
-      {/* 主内容区域 - 撑满剩余空间 */}
-      <div className="flex-1 overflow-hidden">
-        {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-gray-300 dark:border-gray-600 border-t-primary"></div>
+      {/* 加载状态 */}
+      {isLoading && (
+        <div className="flex justify-center items-center h-[50vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-gray-300 dark:border-gray-600 border-t-primary"></div>
+        </div>
+      )}
+
+      {/* 错误状态 */}
+      {error && !isLoading && (
+        <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-4 rounded-lg flex items-start gap-3 mb-6">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold mb-1">加载文件时出错</h3>
+            <p>{error}</p>
           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-full p-6">
-            <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-            <h3 className="text-xl font-bold mb-2">加载失败</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center max-w-md">
-              {error}
-            </p>
-            <Button onClick={() => window.location.reload()}>
-              <RefreshCw className="h-4 w-4 mr-2" /> 重新加载
-            </Button>
-          </div>
-        ) : (
-          <div className="h-full">
-            {fileType === 'code' && (
-              <div className="h-full overflow-auto">
-                <SyntaxHighlighter
-                  language={getLanguage(fileName)}
-                  style={theme === 'dark' ? oneDark : oneLight}
-                  customStyle={{ 
-                    margin: 0, 
-                    height: '100%', 
-                    borderRadius: 0,
-                    fontSize: '14px',
-                    lineHeight: '1.5' 
-                  }}
-                  wrapLongLines={true}
-                  showLineNumbers={true}
-                >
-                  {content}
-                </SyntaxHighlighter>
-              </div>
-            )}
+        </div>
+      )}
 
-            {fileType === 'text' && (
-              <div className="h-full p-6 overflow-auto bg-white dark:bg-gray-800 font-mono">
-                <pre className="whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200">
-                  {content}
-                </pre>
-              </div>
-            )}
+      {/* 文件内容预览 */}
+      {!isLoading && !error && (
+        <div className="bg-card rounded-lg shadow-md overflow-hidden">
+          {/* 图片预览 */}
+          {fileType === 'image' && fileBlob && (
+            <div className="flex justify-center p-4 bg-muted/50 dark:bg-muted/10">
+              <img 
+                src={URL.createObjectURL(fileBlob)} 
+                alt={fileName} 
+                className="max-w-full max-h-[80vh] object-contain"
+              />
+            </div>
+          )}
 
-            {fileType === 'image' && (
-              <div className="flex items-center justify-center h-full p-4 overflow-auto bg-neutral-200 dark:bg-neutral-800 bg-grid-pattern">
-                <div className="relative rounded shadow-lg overflow-hidden bg-white dark:bg-black">
-                  <img 
-                    src={`/api/minio/download?path=${encodeURIComponent(decodedPath)}`}
-                    alt={fileName}
-                    className="max-w-full max-h-[calc(100vh-60px)] object-contain"
-                  />
-                </div>
-              </div>
-            )}
+          {/* PDF预览 */}
+          {fileType === 'pdf' && publicFileUrl && (
+            <iframe 
+              src={publicFileUrl} 
+              className="w-full h-[80vh] border-0" 
+              title={fileName}
+            />
+          )}
 
-            {fileType === 'pdf' && (
-              <div className="h-full bg-neutral-200 dark:bg-neutral-800 p-2">
-                <div className="h-full bg-white dark:bg-black rounded shadow-lg overflow-hidden">
-                  <iframe
-                    src={`/api/minio/download?path=${encodeURIComponent(decodedPath)}`}
-                    className="w-full h-full border-0"
-                    title={fileName}
-                  />
-                </div>
-              </div>
-            )}
+          {/* 代码预览 */}
+          {fileType === 'code' && content && (
+            <div className="max-h-[80vh] overflow-auto">
+              <SyntaxHighlighter 
+                language={getLanguage(fileName)}
+                style={theme === 'dark' ? oneDark : oneLight}
+                showLineNumbers
+                customStyle={{ margin: 0, borderRadius: 0 }}
+              >
+                {content}
+              </SyntaxHighlighter>
+            </div>
+          )}
 
-            {fileType === 'office' && (
-              <div className="h-full bg-neutral-200 dark:bg-neutral-800 p-2">
-                <div className="h-full bg-white dark:bg-gray-800 rounded shadow-lg overflow-hidden">
-                  {publicFileUrl && !officeViewerFailed ? (
-                    <OfficeWebViewer
-                      key={`office-viewer-${retryCount}`}
-                      fileUrl={publicFileUrl}
-                      fileName={fileName}
-                      onError={handleOfficeViewerError}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                      <div className="text-5xl mb-4">{getFileIcon()}</div>
-                      {officeViewerFailed ? (
-                        <>
-                          <h3 className="text-xl font-bold mb-2">无法加载Office文档查看器</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md">
-                            可能是网络连接问题或您的文件格式不受支持。请尝试重新加载或下载后查看该文件。
-                          </p>
-                          <div className="flex space-x-4">
-                            <Button 
-                              variant="outline"
-                              onClick={handleRetryOfficeViewer}
-                              className="px-6"
-                            >
-                              <RefreshCw className="h-4 w-4 mr-2" /> 重试
-                            </Button>
-                            <Button 
-                              onClick={handleDownload}
-                              className="px-6"
-                            >
-                              <Download className="h-4 w-4 mr-2" /> 下载文件
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <h3 className="text-xl font-bold mb-2">正在加载文档...</h3>
-                          <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-gray-300 dark:border-gray-600 border-t-primary mt-4"></div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
+          {/* 纯文本预览 */}
+          {fileType === 'text' && content && (
+            <div className="p-4 max-h-[80vh] overflow-auto whitespace-pre-wrap font-mono text-sm">
+              {content}
+            </div>
+          )}
+
+          {/* Office 文档预览 */}
+          {fileType === 'office' && (
+            <div className="p-8 text-center h-[60vh] flex flex-col items-center justify-center gap-4">
+              <div className="text-6xl mb-2">📄</div>
+              <h3 className="text-xl font-medium">Office 文档预览</h3>
+              <p className="text-muted-foreground mb-4 max-w-md">
+                Office 文档在线预览功能不可用。请下载文档后使用本地应用程序查看。
+              </p>
+              <div className="flex gap-2">
+                <Button onClick={handleDownload} className="flex items-center gap-1">
+                  <Download className="w-4 h-4" />
+                  <span>下载文档</span>
+                </Button>
+                <Button variant="outline" asChild>
+                  <a href={publicFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                    <ExternalLink className="w-4 h-4" />
+                    <span>尝试直接打开</span>
+                  </a>
+                </Button>
               </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+            </div>
+          )}
+
+          {/* 其他文件类型 */}
+          {fileType === 'other' && (
+            <div className="p-8 text-center">
+              <div className="text-6xl mb-4">📎</div>
+              <h3 className="text-xl font-medium mb-2">无法预览此文件</h3>
+              <p className="text-muted-foreground mb-6">
+                当前文件类型不支持在线预览，请下载后查看。
+              </p>
+              <Button onClick={handleDownload} className="flex items-center gap-1">
+                <Download className="w-4 h-4" />
+                <span>下载文件</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </main>
   );
 }

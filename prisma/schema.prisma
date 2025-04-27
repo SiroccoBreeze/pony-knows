@@ -26,8 +26,49 @@ model User {
   messages      Message[] // 用户接收的消息
   accounts      Account[]
   sessions      Session[]
+  userRoles     UserRole[] // 用户角色关联
+  adminLogs     AdminLog[] // 管理员操作日志
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  isActive      Boolean   @default(true) // 用户是否处于激活状态
+}
+
+// 角色模型
+model Role {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  permissions String[]   // 存储权限标识符数组
+  users       UserRole[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+// 用户角色关联表
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, roleId])
+}
+
+// 管理员操作日志
+model AdminLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // 操作类型
+  resource   String   // 资源类型
+  resourceId String?  // 资源ID
+  details    Json?    // 详细信息
+  ip         String?  // IP地址
+  userAgent  String?  // 用户代理
+  createdAt  DateTime @default(now())
 }
 
 // NextAuth.js 所需表 - 第三方账户
@@ -87,15 +128,15 @@ model Post {
 
 // 评论表
 model Comment {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   content         String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  author          User     @relation(fields: [authorId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  author          User      @relation(fields: [authorId], references: [id])
   authorId        String
-  post            Post     @relation(fields: [postId], references: [id])
+  post            Post      @relation(fields: [postId], references: [id])
   postId          String
-  parent          Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  parent          Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
   parentId        String?
   replies         Comment[] @relation("CommentReplies")
   replyToUserId   String?
@@ -136,6 +177,19 @@ model Message {
   post      Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
   postId    String?
   sender    String?  // 发送者名称
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 系统设置表
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  group     String   // 设置分组
+  label     String   // 显示名称
+  type      String   // 设置类型：text, number, boolean, select等
+  options   Json?    // 选项值（用于select类型）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
