@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { MessageSquare, Eye, Clock } from "lucide-react"
 import Link from "next/link"
@@ -36,8 +35,7 @@ export function QuestionCard({
         <div className="flex-1 min-w-0">
           <Link
             href={`/forum/post/${id}`}
-            className="block group-hover:text-primary transition-colors"
-            legacyBehavior>
+            className="block group-hover:text-primary transition-colors">
             <h3 className="text-base font-semibold line-clamp-1">
               {title}
             </h3>
@@ -49,7 +47,10 @@ export function QuestionCard({
           <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
             <div className="flex flex-wrap gap-1">
               {tags.map((tag) => (
-                <Link key={tag} href={`/forum?tag=${tag}`} className="inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                <Link
+                  key={tag}
+                  href={`/forum?tag=${tag}`}
+                  className="inline-flex items-center text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
                   {tag}
                 </Link>
               ))}

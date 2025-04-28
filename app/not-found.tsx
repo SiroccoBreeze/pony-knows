@@ -6,7 +6,7 @@ import { ArrowLeft, Home } from 'lucide-react'
 
 export default function NotFound() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] px-4 text-center">
       <div className="space-y-8 max-w-md">
         {/* 404数字 */}
         <h1 className="text-9xl font-bold tracking-tighter text-primary">404</h1>
@@ -22,9 +22,11 @@ export default function NotFound() {
         {/* 操作按钮 */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
           <Button asChild variant="default" size="lg" className="gap-2">
-            <Link href="/" legacyBehavior>
-              <Home className="h-4 w-4" />
-              返回首页
+            <Link href="/">
+              <div className="flex items-center">
+                <Home className="h-4 w-4 mr-2" />
+                返回首页
+              </div>
             </Link>
           </Button>
           <Button variant="outline" size="lg" className="gap-2" onClick={() => window.history.back()}>

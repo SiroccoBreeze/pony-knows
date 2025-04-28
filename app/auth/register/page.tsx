@@ -34,7 +34,7 @@ export default function RegisterPage() {
         
         <div className="relative z-20 flex flex-col justify-between w-full h-full p-12 text-white">
           <div>
-            <Link href="/" className="flex items-center gap-2 text-white" legacyBehavior>
+            <Link href="/" className="flex items-center gap-2 text-white">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -104,7 +104,7 @@ export default function RegisterPage() {
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8 lg:p-24">
         <div className="w-full max-w-md space-y-8">
           <div className="lg:hidden flex justify-between items-center">
-            <Link href="/" className="flex items-center gap-2" legacyBehavior>
+            <Link href="/" className="flex items-center gap-2">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -119,7 +119,7 @@ export default function RegisterPage() {
               </svg>
               <span className="text-lg font-bold">PonyKnows</span>
             </Link>
-            <Link href="/" legacyBehavior>
+            <Link href="/">
               <Button variant="ghost" size="sm" className="flex items-center gap-1">
                 <ArrowLeft className="h-4 w-4" />
                 返回

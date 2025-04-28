@@ -59,7 +59,7 @@ export default function ForumPage() {
     async function fetchPosts() {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/posts?skipPagination=true');
+        const response = await fetch('/api/posts?skipPagination=true&reviewStatus=approved');
         if (!response.ok) {
           throw new Error('获取帖子失败');
         }
@@ -197,9 +197,9 @@ export default function ForumPage() {
               )}
             </div>
             {!isMobile && (
-              <Button asChild variant="default" className="flex gap-2 rounded-lg">
+              <Button asChild variant="default" size="lg" className="gap-2">
                 <Link href="/forum/new">
-                  <span>发布新帖</span>
+                  发布新帖
                 </Link>
               </Button>
             )}
@@ -252,8 +252,7 @@ export default function ForumPage() {
                   {selectedTag}
                   <Link
                     href="/forum"
-                    className="ml-1 hover:text-primary inline-flex items-center"
-                  >
+                    className="ml-1 hover:text-primary inline-flex items-center">
                     <X className="h-3 w-3" />
                   </Link>
                 </Badge>
@@ -275,13 +274,14 @@ export default function ForumPage() {
                   title={post.title}
                   description={post.content}
                   tags={post.postTags.map(pt => pt.tag.name)}
-                  votes={0}
                   answers={post._count.comments}
                   views={post.views}
                   timeAgo={formatTimeAgo(post.createdAt)}
                 >
                   <Button asChild variant="ghost" className="h-8 w-8 p-0">
-                    <Link href={`/forum/post/${post.id}`}><Search className="h-4 w-4" /></Link>
+                    <Link href={`/forum/post/${post.id}`}>
+                      <Search className="h-4 w-4" />
+                    </Link>
                   </Button>
                 </QuestionCard>
               ))}
@@ -375,14 +375,15 @@ export default function ForumPage() {
                 <Link
                   href={`/forum?tag=${tag.name}`}
                   key={tag.name}
-                  className="flex items-center justify-between py-1.5 px-2 rounded-md text-sm hover:bg-muted group"
-                >
-                  <span className="group-hover:text-primary transition-colors">
-                    {tag.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {tag.count}
-                  </span>
+                  className="flex items-center justify-between py-1.5 px-2 rounded-md text-sm hover:bg-muted group">
+                  <div className="flex items-center justify-between w-full">
+                    <span className="group-hover:text-primary transition-colors">
+                      {tag.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {tag.count}
+                    </span>
+                  </div>
                 </Link>
               ))}
             </div>

@@ -137,6 +137,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       image: user.image,
       isActive: user.isActive,
+      status: user.status,
       roles: user.userRoles.map(ur => ({
         id: ur.role.id,
         name: ur.role.name
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { name, email, password, roles } = body;
+    const { name, email, password, roles, status, isActive } = body;
     
     // 验证请求数据
     if (!name || !email || !password) {
@@ -204,7 +205,9 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         email,
-        password // 注意：实际应用中应对密码进行哈希处理
+        password, // 注意：实际应用中应对密码进行哈希处理
+        status: status || "approved",
+        isActive: isActive !== undefined ? isActive : true,
       }
     });
     
@@ -227,7 +230,7 @@ export async function POST(request: NextRequest) {
         action: "CREATE_USER",
         resource: "USER",
         resourceId: user.id,
-        details: { name, email }
+        details: { name, email, status, isActive }
       }
     });
     

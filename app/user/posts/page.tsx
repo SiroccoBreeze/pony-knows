@@ -298,17 +298,21 @@ export default function PostsPage() {
                   
                   <CardFooter className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/forum/post/${post.id}`} legacyBehavior>
-                        <Eye className="h-4 w-4 mr-1" />
-                        查看
+                      <Link href={`/forum/post/${post.id}`}>
+                        <div className="flex items-center">
+                          <Eye className="h-4 w-4 mr-1" />
+                          查看
+                        </div>
                       </Link>
                     </Button>
                     {!isMobile && (
                       <>
                         <Button variant="outline" size="sm" asChild>
-                          <Link href={`/forum/edit/${post.id}`} legacyBehavior>
-                            <Edit className="h-4 w-4 mr-1" />
-                            编辑
+                          <Link href={`/forum/edit/${post.id}`}>
+                            <div className="flex items-center">
+                              <Edit className="h-4 w-4 mr-1" />
+                              编辑
+                            </div>
                           </Link>
                         </Button>
                         <Button

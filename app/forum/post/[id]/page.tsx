@@ -318,10 +318,10 @@ export default function PostDetailPage() {
           <p className="text-muted-foreground mb-4">{error || "找不到帖子"}</p>
           <div className="flex flex-col md:flex-row gap-4 justify-center">
             <Button asChild>
-              <Link href="/forum" legacyBehavior>返回论坛</Link>
+              <Link href="/forum">返回论坛</Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/forum/new" legacyBehavior>发布新帖</Link>
+              <Link href="/forum/new">发布新帖</Link>
             </Button>
           </div>
         </div>

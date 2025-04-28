@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth/options";  // 直接从lib导入
 import prisma from "@/lib/prisma";
+import { Permission } from "@/lib/permissions";
 
 // 扩展 Session 类型
 interface ExtendedSession {
@@ -10,22 +11,28 @@ interface ExtendedSession {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    roles?: {
+      role: {
+        name: string;
+        permissions: string[];
+      }
+    }[];
   };
 }
 
 // 获取单个帖子
 export async function GET(
   request: Request,
-  { params }: { params: { id: string | Promise<string> } }
+  { params }: { params: { id: string | Promise<{ id: string }> } }
 ) {
   try {
-    // 使用类型断言处理params.id
-    const postId = typeof params.id === 'string' ? params.id : await params.id;
-    console.log("API 请求帖子ID:", postId);
+    // 正确处理params.id - 始终使用await
+    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
+    console.log("API 请求帖子ID:", id);
 
     // 查找帖子
     const post = await prisma.post.findUnique({
-      where: { id: postId },
+      where: { id },
       include: {
         postTags: {
           include: {
@@ -75,13 +82,15 @@ export async function GET(
   }
 }
 
-// 更新帖子
-export async function PUT(
+// 部分更新帖子 - 用于审核等操作
+export async function PATCH(
   request: Request,
-  { params }: { params: { id: string | Promise<string> } }
+  { params }: { params: { id: string | Promise<{ id: string }> } }
 ) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
+    console.log("API - 审核帖子 - 会话:", JSON.stringify(session?.user, null, 2));
+    
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "请先登录" },
@@ -89,8 +98,131 @@ export async function PUT(
       );
     }
 
-    // 使用类型断言处理params.id
-    const postId = typeof params.id === 'string' ? params.id : await params.id;
+    // 正确处理params.id - 始终使用await
+    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
+    const { reviewStatus } = await request.json();
+
+    // 检查帖子是否存在
+    const existingPost = await prisma.post.findUnique({
+      where: { id },
+      select: { 
+        authorId: true,
+        reviewStatus: true 
+      },
+    });
+
+    if (!existingPost) {
+      return NextResponse.json(
+        { error: "帖子不存在" },
+        { status: 404 }
+      );
+    }
+
+    // 获取用户权限
+    const userPermissions: string[] = [];
+    
+    if (session.user.roles) {
+      session.user.roles.forEach(role => {
+        if (role.role.permissions) {
+          userPermissions.push(...role.role.permissions);
+        }
+      });
+    }
+
+    // 特殊处理：超级管理员总是可以审核帖子
+    const isSuperAdmin = session.user.roles?.some(role => role.role.name === "超级管理员");
+    
+    // 检查请求头中是否有管理员覆盖标记
+    const adminOverride = request.headers.get("X-Admin-Override") === "true";
+    
+    // 检查权限：用户必须拥有编辑帖子权限或是超级管理员
+    const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
+    const canEditPosts = userPermissions.includes(Permission.EDIT_POST);
+
+    // 只允许管理员或超级管理员进行审核操作
+    if (!canEditPosts && !isAdmin && !isSuperAdmin && !adminOverride) {
+      return NextResponse.json(
+        { error: "无权审核帖子" },
+        { status: 403 }
+      );
+    }
+
+    // 验证审核状态参数
+    if (!reviewStatus || !['approved', 'pending', 'rejected'].includes(reviewStatus)) {
+      return NextResponse.json(
+        { error: "无效的审核状态" },
+        { status: 400 }
+      );
+    }
+
+    // 更新帖子审核状态
+    const updatedPost = await prisma.post.update({
+      where: { id },
+      data: {
+        reviewStatus,
+      },
+      include: {
+        postTags: {
+          include: {
+            tag: true
+          }
+        },
+        author: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    // 记录管理员操作日志
+    await prisma.adminLog.create({
+      data: {
+        userId: session.user.id,
+        action: "REVIEW_POST",
+        resource: "POST",
+        resourceId: id,
+        details: { 
+          previousStatus: existingPost.reviewStatus,
+          newStatus: reviewStatus 
+        },
+      },
+    });
+
+    return NextResponse.json({
+      ...updatedPost,
+      message: `帖子已${reviewStatus === 'approved' ? '通过审核' : (reviewStatus === 'rejected' ? '被拒绝' : '设为待审核')}`
+    });
+  } catch (error) {
+    console.error("审核帖子失败:", error);
+    const errorMessage = error instanceof Error ? error.message : "未知错误";
+    return NextResponse.json(
+      { error: "审核帖子失败，请稍后再试", details: errorMessage },
+      { status: 500 }
+    );
+  }
+}
+
+// 更新帖子
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string | Promise<{ id: string }> } }
+) {
+  try {
+    const session = await getServerSession(authOptions) as ExtendedSession;
+    console.log("API - 编辑帖子 - 会话:", JSON.stringify(session?.user, null, 2));
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "请先登录" },
+        { status: 401 }
+      );
+    }
+
+    // 正确处理params.id - 始终使用await
+    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
     const body = await request.json();
     const { title, content, tags, status } = body;
 
@@ -102,9 +234,9 @@ export async function PUT(
       );
     }
 
-    // 检查帖子是否存在且属于当前用户
+    // 检查帖子是否存在
     const existingPost = await prisma.post.findUnique({
-      where: { id: postId },
+      where: { id },
       select: { authorId: true },
     });
 
@@ -115,7 +247,48 @@ export async function PUT(
       );
     }
 
-    if (existingPost.authorId !== session.user.id) {
+    // 获取用户权限
+    const userPermissions: string[] = [];
+    console.log("API - 用户角色:", session.user.roles);
+    
+    if (session.user.roles) {
+      session.user.roles.forEach(role => {
+        console.log("API - 处理角色:", role.role.name);
+        console.log("API - 角色权限:", role.role.permissions);
+        
+        if (role.role.permissions) {
+          userPermissions.push(...role.role.permissions);
+        }
+      });
+    }
+
+    console.log("API - 用户权限汇总:", userPermissions);
+
+    // 特殊处理：超级管理员总是可以编辑
+    const isSuperAdmin = session.user.roles?.some(role => role.role.name === "超级管理员");
+    
+    // 检查请求头中是否有管理员覆盖标记
+    const adminOverride = request.headers.get("X-Admin-Override") === "true";
+    console.log("API - 请求头中的管理员覆盖标记:", adminOverride);
+    
+    // 检查权限：用户必须是帖子作者或拥有编辑帖子权限或是超级管理员
+    const isAuthor = existingPost.authorId === session.user.id;
+    const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
+    const canEditPosts = userPermissions.includes(Permission.EDIT_POST);
+
+    console.log("API - 权限检查:", {
+      isAuthor,
+      isAdmin,
+      canEditPosts,
+      isSuperAdmin,
+      adminOverride,
+      userId: session.user.id,
+      authorId: existingPost.authorId,
+      editPostPermission: Permission.EDIT_POST
+    });
+
+    // 放宽权限检查，允许超级管理员编辑任何帖子
+    if (!isAuthor && !canEditPosts && !isAdmin && !isSuperAdmin && !adminOverride) {
       return NextResponse.json(
         { error: "无权修改此帖子" },
         { status: 403 }
@@ -139,16 +312,25 @@ export async function PUT(
 
     // 删除现有标签关联
     await prisma.postToTag.deleteMany({
-      where: { postId },
+      where: { postId: id },
     });
+
+    // 判断审核状态
+    // 如果是普通用户编辑并发布，则需要重新审核
+    // 如果是管理员或超级管理员编辑，则保持审核状态为已通过
+    let reviewStatus = 'approved';
+    if (!adminOverride && !isSuperAdmin && !isAdmin && status === 'published') {
+      reviewStatus = 'pending';  // 普通用户发布的帖子需要重新审核
+    }
 
     // 更新帖子
     const updatedPost = await prisma.post.update({
-      where: { id: postId },
+      where: { id },
       data: {
         title,
         content,
         status,
+        reviewStatus,
         postTags: {
           create: resolvedTags.map(tag => ({
             tagId: tag.id
@@ -171,7 +353,16 @@ export async function PUT(
       }
     });
 
-    return NextResponse.json(updatedPost);
+    // 添加提示信息
+    let message = "帖子已更新";
+    if (reviewStatus === 'pending') {
+      message = "帖子已更新，需要管理员审核后才能在论坛显示";
+    }
+
+    return NextResponse.json({
+      ...updatedPost,
+      message
+    });
   } catch (error) {
     console.error("更新帖子失败:", error);
     const errorMessage = error instanceof Error ? error.message : "未知错误";
@@ -185,10 +376,12 @@ export async function PUT(
 // 删除帖子
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string | Promise<string> } }
+  { params }: { params: { id: string | Promise<{ id: string }> } }
 ) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
+    console.log("API - 删除帖子 - 会话:", JSON.stringify(session?.user, null, 2));
+    
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "请先登录" },
@@ -196,12 +389,12 @@ export async function DELETE(
       );
     }
 
-    // 使用类型断言处理params.id
-    const postId = typeof params.id === 'string' ? params.id : await params.id;
+    // 正确处理params.id - 始终使用await
+    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
 
-    // 检查帖子是否存在且属于当前用户
+    // 检查帖子是否存在
     const existingPost = await prisma.post.findUnique({
-      where: { id: postId },
+      where: { id },
       select: { authorId: true },
     });
 
@@ -212,7 +405,48 @@ export async function DELETE(
       );
     }
 
-    if (existingPost.authorId !== session.user.id) {
+    // 获取用户权限
+    const userPermissions: string[] = [];
+    console.log("API - 用户角色:", session.user.roles);
+    
+    if (session.user.roles) {
+      session.user.roles.forEach(role => {
+        console.log("API - 处理角色:", role.role.name);
+        console.log("API - 角色权限:", role.role.permissions);
+        
+        if (role.role.permissions) {
+          userPermissions.push(...role.role.permissions);
+        }
+      });
+    }
+    
+    console.log("API - 用户权限汇总:", userPermissions);
+
+    // 特殊处理：超级管理员总是可以删除帖子
+    const isSuperAdmin = session.user.roles?.some(role => role.role.name === "超级管理员");
+    
+    // 检查请求头中是否有管理员覆盖标记
+    const adminOverride = request.headers.get("X-Admin-Override") === "true";
+    console.log("API - 请求头中的管理员覆盖标记:", adminOverride);
+    
+    // 检查权限：用户必须是帖子作者或拥有删除帖子权限或是超级管理员
+    const isAuthor = existingPost.authorId === session.user.id;
+    const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
+    const canDeletePosts = userPermissions.includes(Permission.DELETE_POST);
+
+    console.log("API - 权限检查:", {
+      isAuthor,
+      isAdmin,
+      canDeletePosts,
+      isSuperAdmin,
+      adminOverride,
+      userId: session.user.id,
+      authorId: existingPost.authorId,
+      deletePostPermission: Permission.DELETE_POST
+    });
+
+    // 放宽权限检查，允许超级管理员删除任何帖子
+    if (!isAuthor && !canDeletePosts && !isAdmin && !isSuperAdmin && !adminOverride) {
       return NextResponse.json(
         { error: "无权删除此帖子" },
         { status: 403 }
@@ -221,17 +455,17 @@ export async function DELETE(
 
     // 删除帖子相关的标签关联
     await prisma.postToTag.deleteMany({
-      where: { postId },
+      where: { postId: id },
     });
 
     // 删除帖子的评论
     await prisma.comment.deleteMany({
-      where: { postId },
+      where: { postId: id },
     });
 
     // 删除帖子
     await prisma.post.delete({
-      where: { id: postId },
+      where: { id },
     });
 
     return NextResponse.json(

@@ -110,8 +110,7 @@ export default function BookmarksPage() {
                   <CardTitle className="text-lg">
                     <Link
                       href={`/forum/post/${bookmark.id}`}
-                      className="hover:underline"
-                      legacyBehavior>
+                      className="hover:underline">
                       {bookmark.title}
                     </Link>
                   </CardTitle>
@@ -123,8 +122,7 @@ export default function BookmarksPage() {
                   <User className="h-3 w-3 mr-1" />
                   <Link
                     href={`/user/${bookmark.authorId}`}
-                    className="hover:underline"
-                    legacyBehavior>
+                    className="hover:underline">
                     {bookmark.author}
                   </Link>
                   <span className="mx-2">•</span>
@@ -153,7 +151,7 @@ export default function BookmarksPage() {
               </CardContent>
               <CardFooter className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/forum/post/${bookmark.id}`} legacyBehavior>
+                  <Link href={`/forum/post/${bookmark.id}`}>
                     <Eye className="h-4 w-4 mr-1" />
                     查看
                   </Link>

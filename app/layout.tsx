@@ -5,6 +5,7 @@ import "./vditor-override.css";
 import { themeScript } from "@/lib/theme-script";
 import { ClientLayout } from "../components/client-layout";
 import { Providers } from "./providers";
+import HandlePermissionSync from "@/components/handle-permission-sync";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col`}>
         <Providers>
           <ClientLayout>{children}</ClientLayout>
+          <HandlePermissionSync />
         </Providers>
       </body>
     </html>

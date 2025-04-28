@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { TagIcon, HomeIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 
 interface ForumSidebarProps {
   className?: string
@@ -49,10 +48,11 @@ function SidebarLink({ href, children, active = false, icon }: SidebarLinkProps)
         active 
           ? "bg-primary/10 text-primary font-medium" 
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
-    >
-      {icon}
-      {children}
+      )}>
+      <div className="flex items-center">
+        {icon}
+        {children}
+      </div>
     </Link>
   );
 } 

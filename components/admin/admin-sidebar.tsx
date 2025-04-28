@@ -20,6 +20,7 @@ import {
   FileBarChart,
   Menu,
   ChevronLeft,
+  Tag,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -34,16 +35,19 @@ function SidebarItem({ icon, label, href, isActive, permission }: SidebarItemPro
   const { hasPermission, hasAnyPermission } = useAuthPermissions();
   
   // 如果需要权限但用户没有，则不显示
+  let shouldRender = true;
   if (permission) {
     if (Array.isArray(permission)) {
-      if (!hasAnyPermission(permission)) return null;
+      shouldRender = hasAnyPermission(permission);
     } else {
-      if (!hasPermission(permission)) return null;
+      shouldRender = hasPermission(permission);
     }
   }
   
+  if (!shouldRender) return null;
+  
   return (
-    <Link href={href} legacyBehavior>
+    <Link href={href}>
       <Button
         variant={isActive ? "secondary" : "ghost"}
         className={cn(
@@ -64,10 +68,12 @@ export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { isAdmin } = useAuthPermissions();
   
-  // 如果用户没有管理权限，则不显示侧边栏
-  if (!isAdmin) return null;
+  // 创建一个渲染变量，而不是直接返回null
+  // 这样可以保持hooks调用的一致性
+  const shouldRenderSidebar = isAdmin;
   
-  return (
+  // 渲染侧边栏内容，但根据shouldRenderSidebar决定是否显示
+  return shouldRenderSidebar ? (
     <div className={cn(
       "h-screen border-r flex flex-col transition-all duration-300",
       collapsed ? "w-16" : "w-64"
@@ -90,7 +96,7 @@ export function AdminSidebar() {
       <ScrollArea className="flex-1 p-3">
         {collapsed ? (
           <div className="flex flex-col items-center gap-4 py-2">
-            <Link href="/admin" legacyBehavior>
+            <Link href="/admin">
               <Button 
                 variant={pathname === "/admin" ? "secondary" : "ghost"} 
                 size="icon"
@@ -98,7 +104,7 @@ export function AdminSidebar() {
                 <LayoutDashboard size={20} />
               </Button>
             </Link>
-            <Link href="/admin/users" legacyBehavior>
+            <Link href="/admin/users">
               <Button 
                 variant={pathname.startsWith("/admin/users") ? "secondary" : "ghost"} 
                 size="icon"
@@ -106,7 +112,7 @@ export function AdminSidebar() {
                 <Users size={20} />
               </Button>
             </Link>
-            <Link href="/admin/roles" legacyBehavior>
+            <Link href="/admin/roles">
               <Button 
                 variant={pathname.startsWith("/admin/roles") ? "secondary" : "ghost"} 
                 size="icon"
@@ -114,7 +120,7 @@ export function AdminSidebar() {
                 <ShieldCheck size={20} />
               </Button>
             </Link>
-            <Link href="/admin/posts" legacyBehavior>
+            <Link href="/admin/posts">
               <Button 
                 variant={pathname.startsWith("/admin/posts") ? "secondary" : "ghost"} 
                 size="icon"
@@ -164,6 +170,13 @@ export function AdminSidebar() {
                 permission={Permission.VIEW_POSTS}
               />
               <SidebarItem
+                icon={<Tag size={20} />}
+                label="标签管理"
+                href="/admin/tags"
+                isActive={pathname.startsWith("/admin/tags")}
+                permission={Permission.ADMIN_ACCESS}
+              />
+              <SidebarItem
                 icon={<MessageSquare size={20} />}
                 label="评论管理"
                 href="/admin/comments"
@@ -209,5 +222,5 @@ export function AdminSidebar() {
         )}
       </ScrollArea>
     </div>
-  );
+  ) : null;
 } 

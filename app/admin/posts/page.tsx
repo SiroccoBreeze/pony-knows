@@ -35,17 +35,18 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { 
   Search, 
   Eye, 
-  MessageSquare, 
   FileEdit, 
   Trash, 
-  Filter 
+  Filter,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { Permission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
+import { useToast } from "@/hooks/use-toast";
 
 interface Post {
   id: string;
@@ -53,6 +54,7 @@ interface Post {
   content: string;
   createdAt: string;
   status: string;
+  reviewStatus: string;
   views: number;
   author: {
     name: string;
@@ -82,16 +84,18 @@ export default function PostsPage() {
   const [total, setTotal] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [reviewStatusFilter, setReviewStatusFilter] = useState("all");
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   const { hasPermission } = useAuthPermissions();
+  const { toast } = useToast();
   
   // 获取帖子数据
   useEffect(() => {
     fetchPosts();
-  }, [page, searchQuery, selectedTags, statusFilter]);
+  }, [page, searchQuery, selectedTags, statusFilter, reviewStatusFilter]);
   
   // 获取标签数据
   useEffect(() => {
@@ -112,17 +116,26 @@ export default function PostsPage() {
   async function fetchPosts() {
     try {
       setIsLoading(true);
-      let url = `/api/admin/posts?page=${page}&limit=${limit}&search=${searchQuery}`;
+      // 构建API URL，包含管理员标识
+      let url = `/api/posts?page=${page}&limit=${limit}&search=${searchQuery}`;
       
-      if (statusFilter) {
+      if (statusFilter && statusFilter !== "all") {
         url += `&status=${statusFilter}`;
+      }
+      
+      if (reviewStatusFilter && reviewStatusFilter !== "all") {
+        url += `&reviewStatus=${reviewStatusFilter}`;
       }
       
       if (selectedTags.length > 0) {
         url += `&tags=${selectedTags.join(",")}`;
       }
       
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          "X-Admin-Request": "true"  // 管理员请求标识
+        }
+      });
       
       if (!response.ok) throw new Error("获取帖子列表失败");
       
@@ -131,6 +144,11 @@ export default function PostsPage() {
       setTotal(data.total);
     } catch (error) {
       console.error("获取帖子数据失败:", error);
+      toast({
+        title: "错误",
+        description: "获取帖子数据失败，请稍后再试",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -172,15 +190,29 @@ export default function PostsPage() {
     if (selectedPosts.length === 0) return;
     
     try {
-      const response = await fetch("/api/admin/posts/batch", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ids: selectedPosts }),
-      });
+      // 逐个调用删除API，因为似乎没有批量删除的API端点
+      const deletePromises = selectedPosts.map(id => 
+        fetch(`/api/posts/${id}`, {
+          method: "DELETE"
+        })
+      );
       
-      if (!response.ok) throw new Error("批量删除帖子失败");
+      const results = await Promise.all(deletePromises);
+      const failedDeletes = results.filter(res => !res.ok).length;
+      
+      if (failedDeletes > 0) {
+        console.error(`${failedDeletes}个帖子删除失败`);
+        toast({
+          title: "部分操作失败",
+          description: `${failedDeletes}个帖子删除失败`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "成功",
+          description: "所选帖子已删除"
+        });
+      }
       
       // 刷新数据
       fetchPosts();
@@ -188,6 +220,11 @@ export default function PostsPage() {
       setIsDeleteDialogOpen(false);
     } catch (error) {
       console.error("批量删除帖子失败:", error);
+      toast({
+        title: "错误",
+        description: "批量删除帖子失败，请稍后再试",
+        variant: "destructive"
+      });
     }
   }
   
@@ -196,16 +233,67 @@ export default function PostsPage() {
     if (!confirm("确定要删除这篇帖子吗？此操作不可恢复。")) return;
     
     try {
-      const response = await fetch(`/api/admin/posts/${postId}`, {
+      const response = await fetch(`/api/posts/${postId}`, {
         method: "DELETE",
+        headers: {
+          "X-Admin-Override": "true"
+        }
       });
       
       if (!response.ok) throw new Error("删除帖子失败");
+      
+      toast({
+        title: "成功",
+        description: "帖子已删除"
+      });
       
       // 刷新数据
       fetchPosts();
     } catch (error) {
       console.error("删除帖子失败:", error);
+      toast({
+        title: "错误",
+        description: "删除帖子失败，请稍后再试",
+        variant: "destructive"
+      });
+    }
+  }
+  
+  // 审核帖子
+  async function handleReviewPost(postId: string, action: 'approve' | 'reject') {
+    try {
+      const reviewStatus = action === 'approve' ? 'approved' : 'rejected';
+      
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "true"
+        },
+        body: JSON.stringify({
+          reviewStatus
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "审核操作失败");
+      }
+      
+      toast({
+        title: "成功",
+        description: action === 'approve' ? "帖子已通过审核" : "帖子已被拒绝"
+      });
+      
+      // 刷新数据
+      fetchPosts();
+    } catch (error) {
+      console.error("审核帖子失败:", error);
+      toast({
+        title: "错误",
+        description: "审核操作失败，请稍后再试",
+        variant: "destructive"
+      });
     }
   }
   
@@ -227,6 +315,20 @@ export default function PostsPage() {
         return <Badge variant="secondary">草稿</Badge>;
       case "archived":
         return <Badge variant="outline">已归档</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  }
+  
+  // 获取审核状态标签
+  function getReviewStatusBadge(status: string) {
+    switch(status) {
+      case "approved":
+        return <Badge variant="default" className="bg-green-600">已审核</Badge>;
+      case "pending":
+        return <Badge variant="secondary" className="bg-amber-500 text-white">待审核</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">已拒绝</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -272,17 +374,33 @@ export default function PostsPage() {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="帖子状态" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部状态</SelectItem>
+                <SelectItem value="all">全部状态</SelectItem>
                 <SelectItem value="published">已发布</SelectItem>
                 <SelectItem value="draft">草稿</SelectItem>
                 <SelectItem value="archived">已归档</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="w-[130px]" onClick={() => setSelectedTags([])}>
+            <Select value={reviewStatusFilter} onValueChange={setReviewStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="审核状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部</SelectItem>
+                <SelectItem value="pending">待审核</SelectItem>
+                <SelectItem value="approved">已审核</SelectItem>
+                <SelectItem value="rejected">已拒绝</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="w-[130px]" onClick={() => {
+              setSelectedTags([]);
+              setStatusFilter("all");
+              setReviewStatusFilter("all");
+              setSearchQuery("");
+            }}>
               <Filter className="mr-2 h-4 w-4" />
               重置筛选
             </Button>
@@ -313,18 +431,19 @@ export default function PostsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-10">
+                      <TableHead className="w-12">
                         <Checkbox 
                           checked={posts.length > 0 && selectedPosts.length === posts.length}
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
-                      <TableHead>标题</TableHead>
+                      <TableHead>标题 / 内容</TableHead>
                       <TableHead>作者</TableHead>
                       <TableHead>标签</TableHead>
                       <TableHead>状态</TableHead>
-                      <TableHead className="text-center">浏览</TableHead>
-                      <TableHead className="text-center">评论</TableHead>
+                      <TableHead>审核状态</TableHead>
+                      <TableHead>评论</TableHead>
+                      <TableHead>浏览量</TableHead>
                       <TableHead>发布时间</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
@@ -332,7 +451,7 @@ export default function PostsPage() {
                   <TableBody>
                     {posts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center h-24">
+                        <TableCell colSpan={10} className="text-center h-24">
                           没有找到符合条件的帖子
                         </TableCell>
                       </TableRow>
@@ -367,18 +486,49 @@ export default function PostsPage() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{getStatusBadge(post.status)}</TableCell>
-                          <TableCell className="text-center">{post.views}</TableCell>
-                          <TableCell className="text-center">{post._count.comments}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(post.status)}
+                          </TableCell>
+                          <TableCell>
+                            {getReviewStatusBadge(post.reviewStatus || "approved")}
+                          </TableCell>
+                          <TableCell>{post._count?.comments || 0}</TableCell>
+                          <TableCell>{post.views || 0}</TableCell>
                           <TableCell>{formatDate(post.createdAt)}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell>
                             <div className="flex justify-end gap-2">
+                              {post.reviewStatus === "pending" && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleReviewPost(post.id, 'approve')}
+                                    className="h-8 w-8 p-0 text-green-600"
+                                    title="通过审核"
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    <span className="sr-only">通过审核</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleReviewPost(post.id, 'reject')}
+                                    className="h-8 w-8 p-0 text-red-600"
+                                    title="拒绝发布"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                    <span className="sr-only">拒绝发布</span>
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 asChild
+                                className="h-8 w-8 p-0"
+                                title="查看帖子"
                               >
-                                <a href={`/forum/${post.id}`} target="_blank" rel="noopener noreferrer">
+                                <a href={`/forum/post/${post.id}`} target="_blank" rel="noopener noreferrer">
                                   <Eye className="h-4 w-4" />
                                   <span className="sr-only">查看</span>
                                 </a>
@@ -386,8 +536,10 @@ export default function PostsPage() {
                               {hasPermission(Permission.EDIT_POST) && (
                                 <Button
                                   variant="ghost"
-                                  size="icon"
+                                  size="sm"
                                   asChild
+                                  className="h-8 w-8 p-0"
+                                  title="编辑帖子"
                                 >
                                   <a href={`/admin/posts/edit/${post.id}`}>
                                     <FileEdit className="h-4 w-4" />
@@ -398,8 +550,10 @@ export default function PostsPage() {
                               {hasPermission(Permission.DELETE_POST) && (
                                 <Button
                                   variant="ghost"
-                                  size="icon"
+                                  size="sm"
                                   onClick={() => handleDeletePost(post.id)}
+                                  className="h-8 w-8 p-0"
+                                  title="删除帖子"
                                 >
                                   <Trash className="h-4 w-4" />
                                   <span className="sr-only">删除</span>
@@ -442,20 +596,26 @@ export default function PostsPage() {
         </CardContent>
       </Card>
       
-      {/* 批量删除确认对话框 */}
+      {/* 删除确认对话框 */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              您确定要删除选中的 {selectedPosts.length} 篇帖子吗？此操作不可恢复。
+              您确定要删除选中的 {selectedPosts.length} 个帖子吗？此操作不可恢复。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
               取消
             </Button>
-            <Button variant="destructive" onClick={handleBatchDelete}>
+            <Button 
+              variant="destructive" 
+              onClick={handleBatchDelete}
+            >
               确认删除
             </Button>
           </DialogFooter>

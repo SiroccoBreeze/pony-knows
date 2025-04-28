@@ -15,6 +15,12 @@ interface ExtendedUser {
   name?: string | null;
   email?: string | null;
   image?: string | null;
+  roles?: {
+    role: {
+      name: string;
+      permissions: string[];
+    }
+  }[];
 }
 
 // NextAuth 配置
@@ -68,12 +74,42 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        
+        // 获取用户角色信息
+        const userData = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: {
+            userRoles: {
+              include: {
+                role: true
+              }
+            }
+          }
+        });
+        
+        if (userData && userData.userRoles) {
+          token.roles = userData.userRoles.map(userRole => ({
+            role: {
+              name: userRole.role.name,
+              permissions: userRole.role.permissions
+            }
+          }));
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         (session.user as ExtendedUser).id = token.id as string;
+        // 添加角色信息到session
+        if (token.roles) {
+          (session.user as ExtendedUser).roles = token.roles as {
+            role: {
+              name: string;
+              permissions: string[];
+            }
+          }[];
+        }
       }
       return session;
     }

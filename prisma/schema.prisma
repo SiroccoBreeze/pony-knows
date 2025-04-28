@@ -31,6 +31,7 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   isActive      Boolean   @default(true) // 用户是否处于激活状态
+  status        String    @default("approved") // 用户审核状态：pending(待审核)、approved(已通过)、rejected(已拒绝)
 }
 
 // 角色模型
@@ -120,7 +121,8 @@ model Post {
   tags      Tag[]       @relation("PostToTag") // 反向关系字段
   postTags  PostToTag[] // 明确反向关系字段
   messages  Message[]   // 与该帖子相关的消息
-  status    String
+  status    String      // 帖子状态：published(已发布)、draft(草稿)、archived(已归档)
+  reviewStatus String   @default("approved") // 审核状态：pending(待审核)、approved(已通过)、rejected(已拒绝)
   views     Int         @default(0) // 浏览量计数
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt

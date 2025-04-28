@@ -172,8 +172,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               <Link
                 href={href || '#'}
                 className="text-primary hover:underline"
-                {...props}
-                legacyBehavior>
+                {...props}>
                 {children}
               </Link>
             );

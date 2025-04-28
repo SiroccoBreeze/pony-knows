@@ -41,7 +41,7 @@ export default function ServicesPage() {
             </div>
           </CardContent>
           <CardFooter className="bg-muted/10 pt-4">
-            <Link href="/services/database" className="w-full" legacyBehavior>
+            <Link href="/services/database" className="w-full">
               <Button className="w-full">查看表结构</Button>
             </Link>
           </CardFooter>

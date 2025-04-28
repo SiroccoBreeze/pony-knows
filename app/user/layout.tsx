@@ -146,25 +146,26 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                           isActive 
                             ? "bg-primary/10 text-primary font-medium" 
                             : "hover:bg-muted"
-                        )}
-                        legacyBehavior>
-                        <span className={cn(
-                          "mr-3",
-                          isActive ? "text-primary" : "text-muted-foreground"
                         )}>
-                          {item.icon}
-                        </span>
-                        <span>{item.label}</span>
-                        
-                        {item.badge !== null && item.badge !== undefined && item.badge > 0 && (
-                          <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center">
-                            {item.badge > 99 ? '99+' : item.badge}
+                        <div className="flex items-center w-full">
+                          <span className={cn(
+                            "mr-3",
+                            isActive ? "text-primary" : "text-muted-foreground"
+                          )}>
+                            {item.icon}
                           </span>
-                        )}
-                        
-                        {isActive && !item.badge && (
-                          <ChevronRight className="ml-auto h-4 w-4 text-primary" />
-                        )}
+                          <span>{item.label}</span>
+                          
+                          {item.badge !== null && item.badge !== undefined && item.badge > 0 && (
+                            <span className="ml-auto bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center">
+                              {item.badge > 99 ? '99+' : item.badge}
+                            </span>
+                          )}
+                          
+                          {isActive && !item.badge && (
+                            <ChevronRight className="ml-auto h-4 w-4 text-primary" />
+                          )}
+                        </div>
                       </Link>
                     </li>
                   );
@@ -200,29 +201,30 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                           isActive 
                             ? "bg-primary/10 text-primary font-medium" 
                             : "hover:bg-muted"
-                        )}
-                        legacyBehavior>
-                        <span className={cn(
-                          "mr-3",
-                          isActive ? "text-primary" : "text-muted-foreground"
                         )}>
-                          {item.icon}
-                        </span>
-                        <span>{item.label}</span>
-                        
-                        {item.badge !== null && item.badge !== undefined && item.badge > 0 && (
-                          <motion.span
-                            initial={{ scale: 0.8 }}
-                            animate={{ scale: 1 }}
-                            className="ml-auto bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center"
-                          >
-                            {item.badge > 99 ? '99+' : item.badge}
-                          </motion.span>
-                        )}
-                        
-                        {isActive && !item.badge && (
-                          <ChevronRight className="ml-auto h-4 w-4 text-primary" />
-                        )}
+                        <div className="flex items-center w-full">
+                          <span className={cn(
+                            "mr-3",
+                            isActive ? "text-primary" : "text-muted-foreground"
+                          )}>
+                            {item.icon}
+                          </span>
+                          <span>{item.label}</span>
+                          
+                          {item.badge !== null && item.badge !== undefined && item.badge > 0 && (
+                            <motion.span
+                              initial={{ scale: 0.8 }}
+                              animate={{ scale: 1 }}
+                              className="ml-auto bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center"
+                            >
+                              {item.badge > 99 ? '99+' : item.badge}
+                            </motion.span>
+                          )}
+                          
+                          {isActive && !item.badge && (
+                            <ChevronRight className="ml-auto h-4 w-4 text-primary" />
+                          )}
+                        </div>
                       </Link>
                     </motion.li>
                   );

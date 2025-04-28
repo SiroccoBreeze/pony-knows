@@ -36,15 +36,14 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { 
   UserPlus, 
   Search, 
-  MoreHorizontal, 
   Trash, 
   Edit, 
-  Shield, 
-  Lock 
+  Check,
+  X,
 } from "lucide-react";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import { Permission } from "@/lib/permissions";
@@ -60,6 +59,7 @@ interface User {
     name: string;
   }[];
   createdAt: string;
+  status?: string;
 }
 
 interface Role {
@@ -76,7 +76,7 @@ export default function UsersPage() {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
   
   // 用户表单状态
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -87,6 +87,7 @@ export default function UsersPage() {
     email: "",
     password: "",
     isActive: true,
+    status: "approved",
     roles: [] as string[],
   });
   
@@ -122,9 +123,13 @@ export default function UsersPage() {
   async function fetchUsers() {
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `/api/admin/users?page=${page}&limit=${limit}&search=${searchQuery}&role=${roleFilter}`
-      );
+      // 构建URL，当roleFilter为"all"时不包含角色过滤参数
+      let apiUrl = `/api/admin/users?page=${page}&limit=${limit}&search=${searchQuery}`;
+      if (roleFilter && roleFilter !== "all") {
+        apiUrl += `&role=${roleFilter}`;
+      }
+      
+      const response = await fetch(apiUrl);
       
       if (!response.ok) throw new Error("获取用户列表失败");
       
@@ -151,6 +156,7 @@ export default function UsersPage() {
       email: "",
       password: "",
       isActive: true,
+      status: "approved",
       roles: [],
     });
     setIsEditMode(false);
@@ -165,6 +171,7 @@ export default function UsersPage() {
       email: user.email,
       password: "",
       isActive: user.isActive,
+      status: user.status || "approved",
       roles: user.roles.map(role => role.id),
     });
     setIsEditMode(true);
@@ -172,7 +179,7 @@ export default function UsersPage() {
   }
   
   // 更新表单数据
-  function handleFormChange(field: string, value: any) {
+  function handleFormChange(field: string, value: string | boolean | string[]) {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -217,6 +224,7 @@ export default function UsersPage() {
           email: formData.email,
           password: formData.password,
           isActive: formData.isActive,
+          status: formData.status,
           roles: formData.roles,
         }),
       });
@@ -275,6 +283,90 @@ export default function UsersPage() {
     }
   }
   
+  // 审核用户
+  async function handleApproveUser(userId: string) {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "approved",
+          isActive: true
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "审核用户失败");
+      }
+      
+      fetchUsers();
+      
+      toast({
+        title: "成功",
+        description: "已批准用户注册",
+      });
+    } catch (error) {
+      console.error("审核用户失败:", error);
+      toast({
+        title: "错误",
+        description: error instanceof Error ? error.message : "审核用户失败，请稍后再试",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // 拒绝用户注册
+  async function handleRejectUser(userId: string) {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "rejected",
+          isActive: false
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "拒绝用户失败");
+      }
+      
+      fetchUsers();
+      
+      toast({
+        title: "成功",
+        description: "已拒绝用户注册申请",
+      });
+    } catch (error) {
+      console.error("拒绝用户失败:", error);
+      toast({
+        title: "错误",
+        description: error instanceof Error ? error.message : "拒绝用户失败，请稍后再试",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // 根据状态获取标签样式
+  function getStatusBadge(status: string) {
+    switch(status) {
+      case "approved":
+        return <Badge variant="default">已审核</Badge>;
+      case "pending":
+        return <Badge variant="secondary">待审核</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">已拒绝</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  }
+  
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -311,7 +403,7 @@ export default function UsersPage() {
                 <SelectValue placeholder="筛选角色" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部角色</SelectItem>
+                <SelectItem value="all">全部角色</SelectItem>
                 {roles.map((role) => (
                   <SelectItem key={role.id} value={role.name}>
                     {role.name}
@@ -336,6 +428,7 @@ export default function UsersPage() {
                       <TableHead>邮箱</TableHead>
                       <TableHead>角色</TableHead>
                       <TableHead>状态</TableHead>
+                      <TableHead>审核状态</TableHead>
                       <TableHead>注册时间</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
@@ -373,10 +466,35 @@ export default function UsersPage() {
                             </Badge>
                           </TableCell>
                           <TableCell>
+                            {getStatusBadge(user.status || "approved")}
+                          </TableCell>
+                          <TableCell>
                             {new Date(user.createdAt).toLocaleDateString()}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              {user.status === "pending" && hasPermission(Permission.EDIT_USER) && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleApproveUser(user.id)}
+                                    className="gap-1"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                    批准
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRejectUser(user.id)}
+                                    className="gap-1 text-destructive"
+                                  >
+                                    <X className="h-4 w-4" />
+                                    拒绝
+                                  </Button>
+                                </>
+                              )}
                               {hasPermission(Permission.EDIT_USER) && (
                                 <Button
                                   variant="ghost"
@@ -482,7 +600,24 @@ export default function UsersPage() {
               />
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="space-y-2">
+              <Label htmlFor="status">审核状态</Label>
+              <Select 
+                value={formData.status}
+                onValueChange={(value) => handleFormChange("status", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="approved">已审核</SelectItem>
+                  <SelectItem value="pending">待审核</SelectItem>
+                  <SelectItem value="rejected">已拒绝</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center gap-2">
               <Switch
                 id="isActive"
                 checked={formData.isActive}

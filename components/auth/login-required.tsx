@@ -27,15 +27,19 @@ export function LoginRequired() {
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
           <Button asChild size="lg" className="gap-2">
-            <Link href={`/auth/login?callbackUrl=${encodedPath}`} legacyBehavior>
-              <LogIn className="h-4 w-4" />
-              登录
+            <Link href={`/auth/login?callbackUrl=${encodedPath}`}>
+              <div className="flex items-center">
+                <LogIn className="h-4 w-4 mr-2" />
+                登录
+              </div>
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="gap-2">
-            <Link href={`/auth/register?callbackUrl=${encodedPath}`} legacyBehavior>
-              <UserPlus className="h-4 w-4" />
-              注册
+            <Link href={`/auth/register?callbackUrl=${encodedPath}`}>
+              <div className="flex items-center">
+                <UserPlus className="h-4 w-4 mr-2" />
+                注册
+              </div>
             </Link>
           </Button>
         </div>

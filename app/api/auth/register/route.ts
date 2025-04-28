@@ -32,12 +32,14 @@ export async function POST(request: Request) {
     // 加密密码
     const hashedPassword = await hashPassword(password);
 
-    // 创建新用户
+    // 创建新用户，设置为待审核状态
     const user = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
+        isActive: false, // 默认设为禁用状态，等待管理员审核
+        status: "pending", // 添加待审核状态
       },
     });
 
@@ -46,9 +48,16 @@ export async function POST(request: Request) {
       id: user.id,
       name: user.name,
       email: user.email,
+      status: user.status,
     };
 
-    return NextResponse.json(safeUser, { status: 201 });
+    return NextResponse.json(
+      { 
+        ...safeUser, 
+        message: "注册成功，请等待管理员审核通过后才能使用系统" 
+      }, 
+      { status: 201 }
+    );
   } catch (error) {
     console.error("注册失败:", error);
     return NextResponse.json(

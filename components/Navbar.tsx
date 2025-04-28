@@ -217,7 +217,7 @@ const Navbar = () => {
             )}
             {!mounted ? (
               // 加载状态 - 显示占位符
-              <div className="w-8 h-8"></div>
+              (<div className="w-8 h-8"></div>)
             ) : isLoggedIn ? (
               <UserMenu user={user!} />
             ) : (
@@ -248,8 +248,7 @@ const Navbar = () => {
                       key={item.href}
                       href={item.href}
                       className="text-sm font-medium transition-colors hover:text-primary"
-                      onClick={() => setIsOpen(false)}
-                    >
+                      onClick={() => setIsOpen(false)}>
                       {item.label}
                     </Link>
                   ))}
