@@ -395,7 +395,17 @@ export async function DELETE(
     // 检查帖子是否存在
     const existingPost = await prisma.post.findUnique({
       where: { id },
-      select: { authorId: true },
+      select: { 
+        authorId: true,
+        // 关联查询帖子图片
+        images: {
+          select: {
+            id: true,
+            filename: true,
+            url: true
+          }
+        }
+      },
     });
 
     if (!existingPost) {
@@ -452,6 +462,28 @@ export async function DELETE(
         { status: 403 }
       );
     }
+    
+    // 导入MinIO服务
+    const { minioService } = await import('@/lib/minio');
+    
+    // 删除MinIO中的图片文件
+    if (existingPost.images && existingPost.images.length > 0) {
+      console.log(`删除帖子相关的 ${existingPost.images.length} 张图片`);
+      
+      const deleteImagePromises = existingPost.images.map(async (image) => {
+        try {
+          // 确保文件名是正确的MinIO路径格式
+          await minioService.delete(image.filename);
+          console.log(`已从MinIO删除图片: ${image.filename}`);
+        } catch (error) {
+          console.error(`删除MinIO图片失败: ${image.filename}`, error);
+          // 不中断流程，继续删除其他图片
+        }
+      });
+      
+      // 等待所有图片删除完成
+      await Promise.all(deleteImagePromises);
+    }
 
     // 删除帖子相关的标签关联
     await prisma.postToTag.deleteMany({
@@ -463,6 +495,8 @@ export async function DELETE(
       where: { postId: id },
     });
 
+    // 删除帖子的图片记录(数据库记录将级联删除，因为使用了onDelete: Cascade)
+    
     // 删除帖子
     await prisma.post.delete({
       where: { id },

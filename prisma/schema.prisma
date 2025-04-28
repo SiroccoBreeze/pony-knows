@@ -112,20 +112,21 @@ model VerificationToken {
 
 // 帖子表
 model Post {
-  id        String      @id @default(uuid())
-  title     String
-  content   String
-  author    User        @relation(fields: [authorId], references: [id])
-  authorId  String
-  comments  Comment[]
-  tags      Tag[]       @relation("PostToTag") // 反向关系字段
-  postTags  PostToTag[] // 明确反向关系字段
-  messages  Message[]   // 与该帖子相关的消息
-  status    String      // 帖子状态：published(已发布)、draft(草稿)、archived(已归档)
-  reviewStatus String   @default("approved") // 审核状态：pending(待审核)、approved(已通过)、rejected(已拒绝)
-  views     Int         @default(0) // 浏览量计数
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id           String      @id @default(uuid())
+  title        String
+  content      String
+  author       User        @relation(fields: [authorId], references: [id])
+  authorId     String
+  comments     Comment[]
+  tags         Tag[]       @relation("PostToTag") // 反向关系字段
+  postTags     PostToTag[] // 明确反向关系字段
+  messages     Message[]   // 与该帖子相关的消息
+  status       String      // 帖子状态：published(已发布)、draft(草稿)、archived(已归档)
+  reviewStatus String      @default("approved") // 审核状态：pending(待审核)、approved(已通过)、rejected(已拒绝)
+  views        Int         @default(0) // 浏览量计数
+  images       PostImage[] // 帖子包含的图片
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 // 评论表
@@ -194,4 +195,19 @@ model SystemSetting {
   options   Json?    // 选项值（用于select类型）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// 帖子图片表
+model PostImage {
+  id        String   @id @default(uuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  url       String   // 图片URL
+  filename  String   // MinIO中的文件名
+  size      Int      // 图片大小（字节）
+  type      String   // 图片MIME类型
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId])
 }

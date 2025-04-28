@@ -33,7 +33,7 @@ import { cn, isMobileDevice } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link } from "next/navigation";
+import Link from "next/link";
 
 // 定义表单验证模式
 const formSchema = z.object({
@@ -559,6 +559,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
                     placeholder="请输入内容..."
                     onChange={handleContentChange}
                     initialValue={post.content || ""}
+                    postId={id}
                   />
                 </div>
               </div>

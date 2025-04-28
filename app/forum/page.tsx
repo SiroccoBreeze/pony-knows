@@ -59,7 +59,7 @@ export default function ForumPage() {
     async function fetchPosts() {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/posts?skipPagination=true&reviewStatus=approved');
+        const response = await fetch('/api/posts?skipPagination=true&reviewStatus=approved&status=published');
         if (!response.ok) {
           throw new Error('获取帖子失败');
         }

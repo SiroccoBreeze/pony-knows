@@ -159,6 +159,26 @@ class MinioService {
     }
   }
 
+  // 上传Buffer - 用于服务器端处理文件
+  async uploadBuffer(buffer: Buffer, path: string, contentType: string = 'application/octet-stream'): Promise<void> {
+    await this.ensureBucket();
+    const formattedPath = this.formatPath(path);
+    
+    try {
+      // 获取文件元数据
+      const metaData = {
+        'Content-Type': contentType,
+        'Content-Length': buffer.length.toString()
+      };
+      
+      await this.client.putObject(this.defaultBucket, formattedPath, buffer, buffer.length, metaData);
+      console.log(`Buffer上传到 ${path} 成功, 大小: ${buffer.length} 字节`);
+    } catch (error) {
+      console.error(`上传Buffer时出错: ${error}`);
+      throw error;
+    }
+  }
+
   // 下载文件
   async downloadFile(path: string): Promise<Buffer> {
     await this.ensureBucket();

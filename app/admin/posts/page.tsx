@@ -121,6 +121,9 @@ export default function PostsPage() {
       
       if (statusFilter && statusFilter !== "all") {
         url += `&status=${statusFilter}`;
+      } else {
+        // 默认排除草稿状态的帖子
+        url += "&status=published";
       }
       
       if (reviewStatusFilter && reviewStatusFilter !== "all") {

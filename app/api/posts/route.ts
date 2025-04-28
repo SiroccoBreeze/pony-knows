@@ -145,6 +145,15 @@ export async function GET(request: Request) {
     
     if (status) {
       where.status = status;
+    } else {
+      // 默认情况下，如果没有明确请求草稿状态的帖子且不是作者本人请求，则排除草稿帖子
+      const session = await getServerSession(authOptions) as ExtendedSession;
+      const currentUserId = session?.user?.id;
+      
+      // 如果不是作者本人查看，排除草稿帖子
+      if (!currentUserId || (authorId && authorId !== currentUserId)) {
+        where.status = 'published';
+      }
     }
 
     // 处理审核状态查询

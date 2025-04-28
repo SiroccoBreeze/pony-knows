@@ -204,6 +204,99 @@ export default function NewPostPage() {
         throw new Error(errorMessage);
       }
 
+      // 获取响应内容，其中包含新创建的帖子信息
+      const createdPost = await response.json();
+      
+      // 处理编辑器中已上传的临时图片，将它们关联到新创建的帖子
+      if (createdPost && createdPost.id) {
+        try {
+          console.log('开始处理新帖子的图片关联, 帖子ID:', createdPost.id);
+          
+          // 从编辑器的内容中提取图片URL - 这里改进正则表达式匹配
+          const content = contentRef.current;
+          
+          // 使用两种正则表达式，分别匹配Markdown和HTML中的图片
+          const markdownImgRegex = /!\[.*?\]\(([^)]+)\)/g;
+          const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
+          
+          const imageUrls = new Set<string>();
+          
+          // 匹配Markdown格式的图片
+          let mdMatch;
+          while ((mdMatch = markdownImgRegex.exec(content)) !== null) {
+            if (mdMatch[1].includes('/api/posts/images/')) {
+              imageUrls.add(mdMatch[1]);
+            }
+          }
+          
+          // 匹配HTML格式的图片
+          let htmlMatch;
+          while ((htmlMatch = htmlImgRegex.exec(content)) !== null) {
+            if (htmlMatch[1].includes('/api/posts/images/')) {
+              imageUrls.add(htmlMatch[1]);
+            }
+          }
+          
+          console.log('从编辑器内容提取到的图片URL数量:', imageUrls.size);
+          console.log('提取到的URL:', Array.from(imageUrls));
+          
+          // 如果找到图片URL，关联到帖子
+          if (imageUrls.size > 0) {
+            const associatePromises = Array.from(imageUrls).map(url => {
+              // 提取用户ID和文件名
+              const urlParts = url.split('/');
+              const filename = urlParts[urlParts.length - 1];
+              const userId = urlParts[urlParts.length - 2];
+              
+              // 确定文件原始路径 - 假设这是临时文件
+              const filePath = `users/${userId}/temp/images/${filename}`;
+              
+              console.log('关联图片:', {
+                url,
+                filePath,
+                postId: createdPost.id
+              });
+              
+              // 调用关联API
+              return fetch(`/api/posts/${createdPost.id}/images`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  url,
+                  filename: filePath, // 临时目录的路径
+                  size: 0,
+                  type: 'image/jpeg'
+                })
+              }).then(response => {
+                if (!response.ok) {
+                  throw new Error(`关联图片失败: ${response.status}`);
+                }
+                return response.json();
+              }).then(data => {
+                console.log('图片关联成功:', data);
+                return data;
+              });
+            });
+            
+            // 处理所有关联请求的结果
+            Promise.all(associatePromises)
+              .then(results => {
+                console.log(`成功关联 ${results.length} 张图片到帖子 ${createdPost.id}`);
+              })
+              .catch(error => {
+                console.error("关联图片到帖子失败:", error);
+              });
+          } else {
+            console.log('未找到需要关联的图片URL');
+          }
+        } catch (error) {
+          console.error("处理图片关联时出错:", error);
+          // 不中断主流程
+        }
+      }
+
       toast({
         title: "成功！",
         description: status === "draft"

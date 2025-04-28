@@ -12,6 +12,7 @@ import MarkdownRenderer from "@/components/markdown/markdown-renderer";
 import { Toaster } from "react-hot-toast";
 import CommentList from "@/components/comments/CommentList";
 import { isMobileDevice } from "@/lib/utils";
+import ImageViewer from "@/components/ImageViewer";
 
 // 定义帖子接口
 interface Post {
@@ -329,9 +330,12 @@ export default function PostDetailPage() {
     );
   }
 
+  // 正常渲染状态
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="container mx-auto py-6 px-4 forum-post">
       <Toaster position="top-center" />
+      {/* 图片查看器组件 */}
+      <ImageViewer />
       
       {/* 移动端提示 */}
       {isMobile && (
@@ -342,13 +346,13 @@ export default function PostDetailPage() {
         </div>
       )}
 
-      {/* 重新设计布局，确保目录固定且滚动正确 */}
-      <div className="flex flex-col lg:flex-row gap-8">
+      {/* 布局使用flex布局，确保目录固定和内容滚动互不影响 */}
+      <div className="flex flex-col lg:flex-row">
         {/* 目录区 - 桌面版固定在左侧 */}
         {toc.length > 0 && (
-          <aside className="lg:block hidden lg:w-1/5">
-            <div className="fixed overflow-auto pr-4 w-[calc(20%-2rem)]" style={{ maxHeight: 'calc(100vh - 150px)', top: "100px" }}>
-              <Card className="p-4 shadow-sm border-neutral-100 dark:border-neutral-800 bg-card/50 backdrop-blur-sm">
+          <aside className="hidden lg:block w-64 flex-shrink-0 mr-8">
+            <div className="fixed w-64">
+              <Card className="p-4 shadow-md border-neutral-100 dark:border-neutral-800 bg-card/95 backdrop-blur-md">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium flex items-center text-primary">
                     <List className="h-4 w-4 mr-2" />
@@ -356,8 +360,8 @@ export default function PostDetailPage() {
                   </h3>
                 </div>
                 
-                <div className="space-y-1">
-                  <div className="custom-scrollbar">
+                <div>
+                  <div className="custom-scrollbar overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                     <ul className="space-y-2.5 text-sm pl-1">
                       {toc.map((item) => (
                         <li 
@@ -367,10 +371,10 @@ export default function PostDetailPage() {
                           style={{ paddingLeft: `${(item.level - 1) * 0.75}rem` }}
                         >
                           {activeHeading === item.id && (
-                            <div className="absolute left-0 top-0 h-full w-0.5 bg-primary rounded-full"></div>
+                            <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-full"></div>
                           )}
                           <button 
-                            className="block w-full text-left py-1 px-2 rounded-md"
+                            className="block w-full text-left py-1.5 px-2 rounded-md hover:bg-muted/30"
                             onClick={(e: React.MouseEvent) => handleTocItemClick(e, item.id)}
                           >
                             {item.text}
@@ -385,9 +389,9 @@ export default function PostDetailPage() {
           </aside>
         )}
         
-        {/* 移动设备的悬浮目录按钮 */}
+        {/* 移动设备的悬浮目录按钮，保持固定位置 */}
         {toc.length > 0 && (
-          <div className="fixed right-4 bottom-4 lg:hidden z-50">
+          <div className="fixed right-4 bottom-20 lg:hidden z-50">
             <Button
               variant="default"
               size="icon"
@@ -424,10 +428,10 @@ export default function PostDetailPage() {
                         style={{ paddingLeft: `${(item.level - 1) * 1}rem` }}
                       >
                         {activeHeading === item.id && (
-                          <div className="absolute left-0 top-0 h-full w-0.5 bg-primary rounded-full"></div>
+                          <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-full"></div>
                         )}
                         <button 
-                          className="block w-full text-left py-2 px-2 rounded-md"
+                          className="block w-full text-left py-2 px-3 rounded-md hover:bg-muted/30"
                           onClick={(e: React.MouseEvent) => handleTocItemClick(e, item.id)}
                         >
                           {item.text}
@@ -444,27 +448,27 @@ export default function PostDetailPage() {
         )}
         
         {/* 帖子内容区 */}
-        <div className={`${toc.length > 0 ? 'lg:w-4/5 lg:ml-auto' : 'w-full'}`}>
+        <div className="w-full">
           {/* 合并帖子标题、元数据和内容到一个卡片中 */}
-          <Card className="p-6 md:p-8 shadow-sm border-border/50 overflow-hidden bg-card">
+          <Card className="p-6 md:p-8 shadow-md border-border/50 overflow-hidden bg-card">
             {/* 标题和标签 */}
             <div className="mb-6">
               <h1 className="text-2xl md:text-3xl font-bold leading-tight text-foreground mb-4">{post?.title}</h1>
               
               {/* 作者信息和帖子元数据 - 更紧凑的设计 */}
-              <div className="flex items-center text-sm text-muted-foreground border-b border-border/30 pb-4">
-                <Avatar className="h-8 w-8 ring-1 ring-primary/10 mr-3">
-                  <AvatarImage src={post?.author.image || ""} alt={post?.author.name} />
-                  <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
-                    {post?.author.name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="mr-4">
+              <div className="flex flex-wrap md:flex-nowrap items-center text-sm text-muted-foreground border-b border-border/30 pb-4">
+                <div className="flex items-center mr-4 mb-2 md:mb-0">
+                  <Avatar className="h-8 w-8 ring-1 ring-primary/10 mr-3">
+                    <AvatarImage src={post?.author.image || ""} alt={post?.author.name} />
+                    <AvatarFallback className="bg-primary/5 text-primary text-xs font-medium">
+                      {post?.author.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  
                   <span className="font-medium text-sm text-foreground">{post?.author.name}</span>
                 </div>
                 
-                <div className="flex items-center space-x-4 text-xs ml-auto">
+                <div className="flex flex-wrap md:flex-nowrap items-center space-x-2 md:space-x-4 text-xs w-full md:ml-auto">
                   <span className="flex items-center">
                     <Calendar className="h-3.5 w-3.5 mr-1 opacity-70" />
                     {post && formatDate(post.createdAt)}
@@ -489,7 +493,7 @@ export default function PostDetailPage() {
                     <Badge 
                       key={tag.id} 
                       variant="outline" 
-                      className="text-xs px-2 py-0.5 bg-muted/30 hover:bg-muted/50 transition-colors"
+                      className="text-xs px-2 py-0.5 bg-primary/5 hover:bg-primary/10 transition-colors"
                     >
                       {tag.name}
                     </Badge>
@@ -518,7 +522,7 @@ export default function PostDetailPage() {
               <MessageSquare className="h-5 w-5 mr-2 text-primary" />
               评论 ({post?._count.comments || 0})
             </h2>
-            <Card className="p-6 shadow-sm border-border/50 bg-card">
+            <Card className="p-6 shadow-md border-border/50 bg-card">
               <CommentList postId={params.id} />
             </Card>
           </div>
@@ -543,7 +547,7 @@ export default function PostDetailPage() {
         
         /* 自定义滚动条样式 */
         .custom-scrollbar::-webkit-scrollbar {
-          width: 3px;
+          width: 4px;
         }
         
         .custom-scrollbar::-webkit-scrollbar-track {
@@ -551,14 +555,68 @@ export default function PostDetailPage() {
         }
         
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: hsl(var(--border));
+          background-color: hsl(var(--primary) / 0.2);
           border-radius: 20px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: hsl(var(--primary) / 0.3);
         }
         
         /* Firefox */
         .custom-scrollbar {
           scrollbar-width: thin;
-          scrollbar-color: hsl(var(--border)) transparent;
+          scrollbar-color: hsl(var(--primary) / 0.2) transparent;
+        }
+        
+        /* 为Markdown内容增加样式 */
+        .prose img {
+          border-radius: 0.5rem;
+          margin: 1.5rem auto;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .dark .prose img {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .prose pre {
+          border-radius: 0.5rem;
+          margin: 1.5rem 0;
+        }
+        
+        .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+          margin-top: 2rem;
+          margin-bottom: 1rem;
+          color: hsl(var(--foreground));
+          font-weight: 600;
+        }
+        
+        .prose p {
+          margin-bottom: 1.25rem;
+          line-height: 1.75;
+        }
+        
+        .prose blockquote {
+          border-left-color: hsl(var(--primary) / 0.5);
+          background-color: hsl(var(--muted) / 0.3);
+          padding: 1rem;
+          border-radius: 0.25rem;
+        }
+        
+        /* 优化页面布局 */
+        .forum-post {
+          position: relative;
+          min-height: calc(100vh - 200px);
+        }
+        
+        /* 目录固定在左侧，避免和内容重叠 */
+        @media (min-width: 1024px) {
+          .forum-post aside .fixed {
+            position: fixed;
+            top: 100px;
+            z-index: 20;
+          }
         }
       `}</style>
     </div>

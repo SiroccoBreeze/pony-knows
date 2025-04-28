@@ -4,6 +4,7 @@ import React, { useRef, useEffect, forwardRef, useImperativeHandle, useState } f
 import Vditor from 'vditor';
 import 'vditor/dist/index.css';
 import '@/app/vditor-override.css'; // 引入自定义的样式覆盖
+import { toast } from "@/hooks/use-toast";
 
 export interface VditorEditorProps {
   initialValue?: string;
@@ -11,6 +12,7 @@ export interface VditorEditorProps {
   placeholder?: string;
   onChange?: (value: string) => void;
   onBlur?: () => void;
+  postId?: string;
 }
 
 export interface VditorEditorRef {
@@ -24,7 +26,7 @@ export interface VditorEditorRef {
 }
 
 const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
-  ({ initialValue = '', height = 400, placeholder = '请输入内容...', onChange, onBlur }, ref) => {
+  ({ initialValue = '', height = 400, placeholder = '请输入内容...', onChange, onBlur, postId }, ref) => {
     const editorRef = useRef<Vditor | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [domReady, setDomReady] = useState(false);
@@ -70,9 +72,83 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
             },
             upload: {
               accept: 'image/*',
-              handler: (files) => {
-                console.log('上传文件:', files);
-                return Promise.resolve('');
+              multiple: true,
+              fieldName: 'file',
+              filename: (name: string) => name,
+              withCredentials: true,
+              url: '/api/posts/upload-image',
+              headers: postId ? { 'X-Post-ID': postId } : {},
+              extraData: postId ? { postId } : {},
+              error: (msg: string) => {
+                console.error('上传图片错误:', msg);
+                toast({
+                  title: "上传失败",
+                  description: msg || "上传图片失败，请重试",
+                  variant: "destructive"
+                });
+              },
+              success: async (editor: any, msg: string) => {
+                console.log('上传成功回调原始消息:', msg);
+                
+                try {
+                  if (!msg || msg.trim() === '') {
+                    console.warn('上传响应为空');
+                    toast({
+                      title: "上传状态未知",
+                      description: "请检查图片是否上传成功",
+                      variant: "default"
+                    });
+                    return;
+                  }
+                  
+                  const data = JSON.parse(msg);
+                  console.log('解析后的上传响应:', data);
+                  
+                  // 收集有效的图片URL
+                  let imageUrls: string[] = [];
+                  
+                  if (data && data.code === 0 && data.data && data.data.succMap && 
+                      typeof data.data.succMap === 'object') {
+                    // 提取所有非空URL
+                    Object.keys(data.data.succMap).forEach(key => {
+                      const url = data.data.succMap[key];
+                      if (url && typeof url === 'string' && url.trim() !== '') {
+                        imageUrls.push(url);
+                      }
+                    });
+                  }
+                  
+                  console.log('有效的图片URL:', imageUrls);
+                  
+                  // 如果找到有效URL，手动插入到编辑器
+                  if (imageUrls.length > 0 && editorRef.current) {
+                    // 构建Markdown图片标记
+                    const markdown = imageUrls.map(url => `![图片](${url})`).join('\n');
+                    
+                    // 插入内容
+                    editorRef.current.insertValue(markdown);
+                    
+                    toast({
+                      title: "上传成功",
+                      description: "图片已成功上传并插入",
+                      variant: "default"
+                    });
+                  } else {
+                    console.warn('未找到有效的图片URL');
+                    toast({
+                      title: "上传可能成功",
+                      description: "但未找到有效的图片，请手动检查",
+                      variant: "default"
+                    });
+                  }
+                } catch (e) {
+                  console.error('处理上传响应时出错:', e);
+                  toast({
+                    title: "处理上传响应失败",
+                    description: "请检查控制台了解详情",
+                    variant: "destructive"
+                  });
+                }
               },
             },
             input: (value: string) => {
