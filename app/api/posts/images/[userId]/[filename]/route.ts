@@ -6,7 +6,9 @@ export async function GET(
   { params }: { params: { userId: string; filename: string } }
 ) {
   try {
-    const { userId, filename } = params;
+    // 确保params是一个已解析的Promise对象
+    const paramsData = await Promise.resolve(params);
+    const { userId, filename } = paramsData;
 
     if (!userId || !filename) {
       return NextResponse.json(

@@ -26,8 +26,12 @@ export async function GET(
   { params }: { params: { id: string | Promise<{ id: string }> } }
 ) {
   try {
-    // 正确处理params.id - 始终使用await
-    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
+    // 正确处理params - 先await整个params对象
+    const paramsData = await Promise.resolve(params);
+    // 如果id是Promise，则await它
+    const id = typeof paramsData.id === 'string' 
+      ? paramsData.id 
+      : (await paramsData.id).id;
     console.log("API 请求帖子ID:", id);
 
     // 查找帖子
@@ -98,8 +102,12 @@ export async function PATCH(
       );
     }
 
-    // 正确处理params.id - 始终使用await
-    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
+    // 正确处理params - 先await整个params对象
+    const paramsData = await Promise.resolve(params);
+    // 如果id是Promise，则await它
+    const id = typeof paramsData.id === 'string' 
+      ? paramsData.id 
+      : (await paramsData.id).id;
     const { reviewStatus } = await request.json();
 
     // 检查帖子是否存在
@@ -221,10 +229,14 @@ export async function PUT(
       );
     }
 
-    // 正确处理params.id - 始终使用await
-    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
+    // 正确处理params - 先await整个params对象
+    const paramsData = await Promise.resolve(params);
+    // 如果id是Promise，则await它
+    const id = typeof paramsData.id === 'string' 
+      ? paramsData.id 
+      : (await paramsData.id).id;
     const body = await request.json();
-    const { title, content, tags, status } = body;
+    const { title, content, tags, status, removedImageIds } = body;
 
     // 验证请求数据
     if (!title || !content || !tags || !Array.isArray(tags)) {
@@ -237,7 +249,17 @@ export async function PUT(
     // 检查帖子是否存在
     const existingPost = await prisma.post.findUnique({
       where: { id },
-      select: { authorId: true },
+      select: { 
+        authorId: true,
+        // 关联查询帖子图片
+        images: {
+          select: {
+            id: true,
+            filename: true,
+            url: true
+          }
+        }
+      },
     });
 
     if (!existingPost) {
@@ -315,6 +337,47 @@ export async function PUT(
       where: { postId: id },
     });
 
+    // 处理被删除的图片
+    if (removedImageIds && Array.isArray(removedImageIds) && removedImageIds.length > 0) {
+      console.log(`处理 ${removedImageIds.length} 张需要删除的图片`);
+      
+      // 找出要删除的图片信息
+      const imagesToDelete = existingPost.images.filter(img => 
+        removedImageIds.includes(img.id)
+      );
+      
+      if (imagesToDelete.length > 0) {
+        // 导入MinIO服务
+        const { minioService } = await import('@/lib/minio');
+        
+        // 删除MinIO中的图片文件
+        const deleteImagePromises = imagesToDelete.map(async (image) => {
+          try {
+            // 从MinIO删除文件
+            await minioService.delete(image.filename);
+            console.log(`已从MinIO删除图片: ${image.filename}`);
+          } catch (error) {
+            console.error(`删除MinIO图片失败: ${image.filename}`, error);
+            // 不中断流程，继续删除其他图片
+          }
+        });
+        
+        // 等待所有图片删除完成
+        await Promise.all(deleteImagePromises);
+        
+        // 从数据库删除图片记录
+        await prisma.postImage.deleteMany({
+          where: {
+            id: {
+              in: removedImageIds
+            }
+          }
+        });
+        
+        console.log(`已从数据库删除 ${removedImageIds.length} 张图片记录`);
+      }
+    }
+
     // 判断审核状态
     // 如果是普通用户编辑并发布，则需要重新审核
     // 如果是管理员或超级管理员编辑，则保持审核状态为已通过
@@ -349,7 +412,8 @@ export async function PUT(
             name: true,
             email: true,
           }
-        }
+        },
+        images: true // 包含图片信息
       }
     });
 
@@ -389,8 +453,12 @@ export async function DELETE(
       );
     }
 
-    // 正确处理params.id - 始终使用await
-    const id = typeof params.id === 'string' ? params.id : (await params.id).id;
+    // 正确处理params - 先await整个params对象
+    const paramsData = await Promise.resolve(params);
+    // 如果id是Promise，则await它
+    const id = typeof paramsData.id === 'string' 
+      ? paramsData.id 
+      : (await paramsData.id).id;
 
     // 检查帖子是否存在
     const existingPost = await prisma.post.findUnique({
