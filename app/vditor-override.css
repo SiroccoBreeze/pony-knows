@@ -118,6 +118,8 @@
   margin: 0.5em auto;
   cursor: pointer; /* 指示可点击 */
   transition: transform 0.2s ease; /* 添加悬停效果 */
+  border: none !important; /* 去掉边框 */
+  box-shadow: none !important; /* 去掉阴影 */
 }
 
 .forum-post img:hover, .post-detail img:hover {

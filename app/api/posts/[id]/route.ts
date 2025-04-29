@@ -55,6 +55,7 @@ export async function GET(
             comments: true,
           },
         },
+        images: true, // 添加图片关联
       },
     });
 

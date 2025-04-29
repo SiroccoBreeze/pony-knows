@@ -50,6 +50,14 @@ interface PostTag {
   tag: Tag;
 }
 
+interface PostImage {
+  id: string;
+  url: string;
+  filename: string;
+  size: number;
+  type: string;
+}
+
 interface Post {
   id: string;
   title: string;
@@ -59,6 +67,7 @@ interface Post {
   postTags?: PostTag[];
   createdAt: string;
   updatedAt: string;
+  images?: PostImage[];
 }
 
 interface Tag {
@@ -314,6 +323,52 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       }
 
       const status = values.status;
+      
+      // 检测已删除的图片
+      const removedImageIds: string[] = [];
+      
+      // 只有在帖子有图片时才进行检测
+      if (post?.images && post.images.length > 0) {
+        console.log('检测已删除的图片...');
+        
+        // 从编辑器的内容中提取图片URL
+        const content = contentRef.current;
+        
+        // 使用两种正则表达式，分别匹配Markdown和HTML中的图片
+        const markdownImgRegex = /!\[.*?\]\(([^)]+)\)/g;
+        const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
+        
+        const imageUrls = new Set<string>();
+        
+        // 匹配Markdown格式的图片
+        let mdMatch;
+        while ((mdMatch = markdownImgRegex.exec(content)) !== null) {
+          if (mdMatch[1].includes('/api/posts/images/')) {
+            imageUrls.add(mdMatch[1]);
+          }
+        }
+        
+        // 匹配HTML格式的图片
+        let htmlMatch;
+        while ((htmlMatch = htmlImgRegex.exec(content)) !== null) {
+          if (htmlMatch[1].includes('/api/posts/images/')) {
+            imageUrls.add(htmlMatch[1]);
+          }
+        }
+        
+        console.log('当前编辑器中的图片URL数量:', imageUrls.size);
+        
+        // 检查哪些图片已经不在编辑器内容中
+        post.images.forEach(image => {
+          if (!Array.from(imageUrls).some(url => url === image.url)) {
+            // 这个图片URL不在当前编辑器内容中，说明被删除了
+            removedImageIds.push(image.id);
+            console.log('检测到删除的图片:', image.url);
+          }
+        });
+        
+        console.log('检测到需要删除的图片数量:', removedImageIds.length);
+      }
 
       // 准备提交的数据
       const postData = {
@@ -323,6 +378,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
           .map((tag) => tag.trim())
           .filter(Boolean),
         content: contentRef.current,
+        removedImageIds: removedImageIds,
       };
 
       console.log("准备提交的数据:", postData);

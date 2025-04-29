@@ -151,10 +151,14 @@ export default function PostDetailPage() {
               sanitizedText = `section-${level}`;
             }
             
+            // 使用更一致的ID生成方式，必须加入索引确保唯一性
             const id = `heading-${sanitizedText}-${index}`;
             
-            // 给标题添加ID以支持锚点跳转
+            // 给标题添加ID以支持锚点跳转和滚动监测
             heading.id = id;
+            
+            // 确保heading属性包含对应文本，便于调试
+            heading.setAttribute('data-title', text);
             
             // 为每个标题添加更大的上边距，防止被导航栏遮挡
             heading.setAttribute('style', 'scroll-margin-top: 100px;');
@@ -162,8 +166,16 @@ export default function PostDetailPage() {
             return { id, text, level };
           });
           
-          // 根据级别组织目录结构
+          // 设置目录结构
           setToc(tocItems);
+          
+          // 添加调试日志
+          console.log("已生成标题:", tocItems);
+          
+          // 初始检测当前可见标题
+          setTimeout(() => {
+            handleScrollForHighlight();
+          }, 300);
           
           // 如果URL中包含锚点，尝试滚动到对应位置
           if (window.location.hash) {
@@ -189,40 +201,111 @@ export default function PostDetailPage() {
     }
   }, [post]);
 
+  // 滚动监听函数
+  const handleScrollForHighlight = () => {
+    if (!contentRef.current) return;
+    
+    const headings = Array.from(contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6')) as HTMLHeadingElement[];
+    if (headings.length === 0) return;
+    
+    // 获取视窗高度和滚动位置
+    const viewportHeight = window.innerHeight;
+    const scrollTop = window.scrollY;
+    
+    // 计算视窗中心点
+    const viewportCenter = scrollTop + viewportHeight / 3;
+    
+    // 找到最接近视窗中心的标题
+    let closestHeading: HTMLHeadingElement | null = null;
+    let closestDistance = Infinity;
+    
+    headings.forEach(heading => {
+      const rect = heading.getBoundingClientRect();
+      const headingTop = rect.top + window.scrollY;
+      
+      // 计算与视窗中心的距离
+      const distance = Math.abs(headingTop - viewportCenter);
+      
+      // 如果当前标题比之前找到的标题更靠近中心
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestHeading = heading;
+      }
+    });
+    
+    // 更新活动标题
+    if (closestHeading && closestHeading.id) {
+      if (activeHeading !== closestHeading.id) {
+        setActiveHeading(closestHeading.id);
+        console.log("当前活动标题更新为:", closestHeading.textContent, "ID:", closestHeading.id);
+      }
+    }
+  };
+
   // 监听滚动以高亮当前目录项
   useEffect(() => {
     if (!contentRef.current || toc.length === 0) return;
     
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActiveHeading(entry.target.id);
-          }
-        });
-      },
-      { 
-        rootMargin: "-100px 0px -70% 0px",
-        threshold: 0 
-      }
-    );
+    // 使用更高效的节流实现
+    let scrollTimeout: ReturnType<typeof setTimeout>;
+    let isScrolling = false;
     
-    // 为所有标题添加观察器
-    const headings = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    headings.forEach((heading) => {
-      observer.observe(heading);
+    const scrollHandler = () => {
+      if (!isScrolling) {
+        isScrolling = true;
+        
+        // 使用requestAnimationFrame以确保平滑
+        window.requestAnimationFrame(() => {
+          handleScrollForHighlight();
+          
+          // 添加防抖，避免过于频繁的状态更新
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => {
+            handleScrollForHighlight();
+          }, 100);
+          
+          isScrolling = false;
+        });
+      }
+    };
+    
+    // 添加滚动事件监听
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+    window.addEventListener('resize', scrollHandler, { passive: true });
+    
+    // 添加内容变化的监听（例如图片加载完成后）
+    const observer = new MutationObserver(() => {
+      requestAnimationFrame(() => {
+        handleScrollForHighlight();
+      });
     });
     
-    return () => {
-      headings.forEach((heading) => {
-        observer.unobserve(heading);
+    if (contentRef.current) {
+      observer.observe(contentRef.current, { 
+        subtree: true, 
+        childList: true,
+        attributes: true,
+        attributeFilter: ['src', 'style', 'class'] 
       });
+    }
+    
+    // 初始调用确保首次加载时高亮正确
+    setTimeout(scrollHandler, 300);
+    
+    return () => {
+      window.removeEventListener('scroll', scrollHandler);
+      window.removeEventListener('resize', scrollHandler);
+      observer.disconnect();
+      clearTimeout(scrollTimeout);
     };
-  }, [toc]);
+  }, [toc, activeHeading]);
 
-  // 改进目录项点击处理逻辑
+  // 增强目录项点击高亮效果，确保点击后正确高亮
   const handleTocItemClick = (e: React.MouseEvent, itemId: string) => {
     e.preventDefault();
+    
+    // 立即更新高亮状态，提升用户体验
+    setActiveHeading(itemId);
     
     // 延迟执行，确保DOM完全更新
     setTimeout(() => {
@@ -231,14 +314,11 @@ export default function PostDetailPage() {
         // 设置URL但不触发默认跳转
         window.history.pushState(null, '', `#${itemId}`);
         
-        // 更新活动标题状态
-        setActiveHeading(itemId);
-        
         // 获取元素的位置
         const rect = element.getBoundingClientRect();
         
         // 考虑导航栏高度的偏移量
-        const navHeight = 100; // 增加偏移量以确保标题不被导航栏遮挡
+        const navHeight = 80; 
         
         // 计算绝对滚动位置，考虑当前滚动位置和元素的相对位置
         const absoluteElementTop = rect.top + window.pageYOffset;
@@ -252,16 +332,21 @@ export default function PostDetailPage() {
         
         // 在移动设备上点击后关闭目录
         setShowToc(false);
+        
+        // 确保滚动完成后再次检查高亮状态
+        setTimeout(() => {
+          handleScrollForHighlight();
+        }, 500);
       } else {
         // 不输出控制台错误信息，而是尝试恢复
         // 添加错误恢复机制 - 尝试重新获取所有标题并找到最接近的
-        const allHeadings = contentRef.current?.querySelectorAll('h1, h2, h3, h4, h5, h6');
+        const allHeadings = Array.from(contentRef.current?.querySelectorAll('h1, h2, h3, h4, h5, h6') || []) as HTMLHeadingElement[];
         if (allHeadings && allHeadings.length > 0) {
           // 获取点击的目录项文本（从toc数组中）
           const clickedItem = toc.find(item => item.id === itemId);
           if (clickedItem) {
             // 尝试通过文本内容匹配
-            const matchingHeading = Array.from(allHeadings).find(
+            const matchingHeading = allHeadings.find(
               h => h.textContent === clickedItem.text
             );
             
@@ -275,6 +360,11 @@ export default function PostDetailPage() {
                 top: scrollPosition,
                 behavior: 'smooth'
               });
+              
+              // 手动设置活动标题
+              if (matchingHeading.id) {
+                setActiveHeading(matchingHeading.id);
+              }
               
               // 在移动设备上点击后关闭目录
               setShowToc(false);
@@ -363,24 +453,27 @@ export default function PostDetailPage() {
                 <div>
                   <div className="custom-scrollbar overflow-y-auto pr-2" style={{ maxHeight: 'calc(100vh - 220px)' }}>
                     <ul className="space-y-2.5 text-sm pl-1">
-                      {toc.map((item) => (
-                        <li 
-                          key={item.id} 
-                          className={`relative hover:text-primary transition-colors duration-200 ease-in-out
-                            ${activeHeading === item.id ? 'text-primary font-medium active' : 'text-muted-foreground'}`}
-                          style={{ paddingLeft: `${(item.level - 1) * 0.75}rem` }}
-                        >
-                          {activeHeading === item.id && (
-                            <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-full"></div>
-                          )}
-                          <button 
-                            className="block w-full text-left py-1.5 px-2 rounded-md hover:bg-muted/30"
-                            onClick={(e: React.MouseEvent) => handleTocItemClick(e, item.id)}
+                      {toc.map((item) => {
+                        const isActive = activeHeading === item.id;
+                        return (
+                          <li 
+                            key={item.id} 
+                            className={`relative hover:text-primary transition-colors duration-200 ease-in-out
+                              ${isActive ? 'text-primary font-bold active bg-primary/10 rounded-md border-l-2 border-primary pl-2' : 'text-muted-foreground'}`}
+                            style={{ paddingLeft: `${(item.level - 1) * 0.75}rem` }}
                           >
-                            {item.text}
-                          </button>
-                        </li>
-                      ))}
+                            {isActive && (
+                              <div className="absolute left-0 top-0 h-full w-2 bg-primary rounded-full"></div>
+                            )}
+                            <button 
+                              className={`block w-full text-left py-1.5 px-2 rounded-md hover:bg-muted/50 ${isActive ? 'font-medium' : ''}`}
+                              onClick={(e: React.MouseEvent) => handleTocItemClick(e, item.id)}
+                            >
+                              {item.text}
+                            </button>
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>
@@ -420,24 +513,27 @@ export default function PostDetailPage() {
               <div className="overflow-y-auto h-[calc(100%-3rem)] pb-safe custom-scrollbar">
                 {toc.length > 0 ? (
                   <ul className="space-y-2.5">
-                    {toc.map((item) => (
-                      <li 
-                        key={item.id} 
-                        className={`relative hover:text-primary transition-colors duration-200
-                          ${activeHeading === item.id ? 'text-primary font-medium active' : 'text-muted-foreground'}`}
-                        style={{ paddingLeft: `${(item.level - 1) * 1}rem` }}
-                      >
-                        {activeHeading === item.id && (
-                          <div className="absolute left-0 top-0 h-full w-1 bg-primary rounded-full"></div>
-                        )}
-                        <button 
-                          className="block w-full text-left py-2 px-3 rounded-md hover:bg-muted/30"
-                          onClick={(e: React.MouseEvent) => handleTocItemClick(e, item.id)}
+                    {toc.map((item) => {
+                      const isActive = activeHeading === item.id;
+                      return (
+                        <li 
+                          key={item.id} 
+                          className={`relative hover:text-primary transition-colors duration-200 ease-in-out
+                            ${isActive ? 'text-primary font-bold active bg-primary/10 rounded-md border-l-2 border-primary pl-2' : 'text-muted-foreground'}`}
+                          style={{ paddingLeft: `${(item.level - 1) * 0.75}rem` }}
                         >
-                          {item.text}
-                        </button>
-                      </li>
-                    ))}
+                          {isActive && (
+                            <div className="absolute left-0 top-0 h-full w-2 bg-primary rounded-full"></div>
+                          )}
+                          <button 
+                            className={`block w-full text-left py-1.5 px-2 rounded-md hover:bg-muted/50 ${isActive ? 'font-medium' : ''}`}
+                            onClick={(e: React.MouseEvent) => handleTocItemClick(e, item.id)}
+                          >
+                            {item.text}
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <div className="text-muted-foreground py-4 text-center">无目录内容</div>
@@ -530,6 +626,97 @@ export default function PostDetailPage() {
       </div>
       
       <style jsx global>{`
+        /* 为目录增加样式 */
+        li.active {
+          animation: highlight-pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes highlight-pulse {
+          0% { background-color: hsl(var(--primary) / 0.15); }
+          50% { background-color: hsl(var(--primary) / 0.25); }
+          100% { background-color: hsl(var(--primary) / 0.15); }
+        }
+        
+        /* 增加目录项的过渡效果 */
+        .custom-scrollbar li {
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        
+        /* 目录项高亮动画 */
+        .custom-scrollbar li button {
+          position: relative;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+        }
+        
+        .custom-scrollbar li button:before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          height: 100%;
+          width: 0;
+          background-color: hsl(var(--primary) / 0.12);
+          z-index: -1;
+          transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .custom-scrollbar li button:hover:before {
+          width: 100%;
+        }
+        
+        /* 当前活动项样式增强 */
+        .custom-scrollbar li.active button {
+          transform: translateX(5px) scale(1.02);
+          font-weight: 600;
+        }
+        
+        .custom-scrollbar li .absolute {
+          transition: opacity 0.3s ease, transform 0.3s ease;
+          opacity: 0;
+          transform: scaleY(0.7);
+        }
+        
+        .custom-scrollbar li.active .absolute {
+          opacity: 1;
+          transform: scaleY(1);
+          animation: pulse-border 2s infinite ease-in-out;
+        }
+        
+        @keyframes pulse-border {
+          0% { background-color: hsl(var(--primary) / 0.7); box-shadow: 0 0 5px hsl(var(--primary) / 0.5); }
+          50% { background-color: hsl(var(--primary) / 1); box-shadow: 0 0 8px hsl(var(--primary)); }
+          100% { background-color: hsl(var(--primary) / 0.7); box-shadow: 0 0 5px hsl(var(--primary) / 0.5); }
+        }
+
+        /* 活跃目录项加入顶部条纹动画 */
+        .custom-scrollbar li.active:before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+          animation: stripe-animate 2s linear infinite;
+        }
+        
+        @keyframes stripe-animate {
+          0% { width: 0; left: 0; }
+          50% { width: 100%; left: 0; }
+          100% { width: 0; left: 100%; }
+        }
+        
+        /* 强化活动项目的视觉显示 */
+        .custom-scrollbar li.active {
+          background-color: hsl(var(--primary) / 0.15);
+          border-radius: 0.375rem;
+          box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2);
+        }
+        
+        /* 其他样式保持不变 */
         html {
           scroll-behavior: smooth;
           scroll-padding-top: 100px;
@@ -571,13 +758,15 @@ export default function PostDetailPage() {
         
         /* 为Markdown内容增加样式 */
         .prose img {
-          border-radius: 0.5rem;
+          border-radius: 0;
           margin: 1.5rem auto;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+          box-shadow: none;
+          border: none;
         }
         
         .dark .prose img {
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+          box-shadow: none;
+          border: none;
         }
         
         .prose pre {
