@@ -62,7 +62,8 @@ export async function POST(request: Request) {
     // 上传文件到MinIO
     await minioService.uploadFile(file, filePath);
 
-    // 计算存储的图片URL - 保持URL路径格式一致
+    // 计算存储的图片URL - 无论临时还是正式，都使用相同的URL格式
+    // 这样当图片从临时移动到正式路径后，URL不需要改变
     const fileUrl = `/api/posts/images/${userId}/${uniqueFileName}`;
     // 获取完整URL路径
     const fullFileUrl = `${request.headers.get('origin')}${fileUrl}`;

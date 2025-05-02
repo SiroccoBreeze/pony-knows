@@ -205,7 +205,9 @@ export default function PostDetailPage() {
   const handleScrollForHighlight = () => {
     if (!contentRef.current) return;
     
-    const headings = Array.from(contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6')) as HTMLHeadingElement[];
+    // 获取所有标题并转换为数组
+    const headingElements = contentRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    const headings = Array.from(headingElements);
     if (headings.length === 0) return;
     
     // 获取视窗高度和滚动位置
@@ -216,10 +218,11 @@ export default function PostDetailPage() {
     const viewportCenter = scrollTop + viewportHeight / 3;
     
     // 找到最接近视窗中心的标题
-    let closestHeading: HTMLHeadingElement | null = null;
+    let closestHeading = null;
     let closestDistance = Infinity;
     
-    headings.forEach(heading => {
+    for (let i = 0; i < headings.length; i++) {
+      const heading = headings[i] as HTMLElement;
       const rect = heading.getBoundingClientRect();
       const headingTop = rect.top + window.scrollY;
       
@@ -231,7 +234,7 @@ export default function PostDetailPage() {
         closestDistance = distance;
         closestHeading = heading;
       }
-    });
+    }
     
     // 更新活动标题
     if (closestHeading && closestHeading.id) {

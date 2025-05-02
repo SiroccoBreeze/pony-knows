@@ -17,11 +17,25 @@ export async function GET(
       );
     }
 
-    // 构建文件路径
-    const filePath = `users/${userId}/posts/images/${filename}`;
+    // 构建文件路径 - 先尝试正式路径
+    let filePath = `users/${userId}/posts/images/${filename}`;
+    let fileContent;
 
-    // 从MinIO下载文件
-    const fileContent = await minioService.downloadFile(filePath);
+    try {
+      // 尝试从正式路径下载文件
+      fileContent = await minioService.downloadFile(filePath);
+    } catch (error) {
+      console.log(`文件不存在于正式路径，尝试临时路径: ${error}`);
+      
+      // 如果正式路径失败，尝试从临时路径获取
+      filePath = `users/${userId}/temp/images/${filename}`;
+      try {
+        fileContent = await minioService.downloadFile(filePath);
+      } catch (tempError) {
+        console.error(`文件在临时路径也不存在: ${tempError}`);
+        throw new Error('找不到请求的图片文件');
+      }
+    }
 
     // 根据文件扩展名设置正确的Content-Type
     const fileExtension = filename.split('.').pop()?.toLowerCase() || '';
