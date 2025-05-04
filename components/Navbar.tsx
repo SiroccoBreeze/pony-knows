@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import axios from "axios";
 import { MainNavigation } from "./main-navigation";
-import { NavigationItem } from "./navigation-item";
+import { NavigationItem } from "@/components/navigation-item";
 import { UserPermission } from "@/lib/permissions";
 
 // 通知项目类型
@@ -93,15 +93,24 @@ const Navbar = () => {
   // 用于跟踪最后检查的更新时间
   const lastCheckedUpdate = React.useRef<string | null>(null);
 
-  // 移动端导航菜单项
-  const mobileNavItems = [
-    { href: "/", label: "首页" },
-    { href: "/Manuscript", label: "实施底稿" },
-    { href: "/services", label: "服务", permission: UserPermission.VIEW_SERVICES },
-    { href: "/services/minio", label: "网盘服务", permission: UserPermission.ACCESS_MINIO },
-    { href: "/services/file-links", label: "资源下载", permission: UserPermission.ACCESS_FILE_DOWNLOADS },
-    { href: "/forum", label: "论坛", permission: UserPermission.VIEW_FORUM },
-  ];
+  // 移动端导航组件
+  const MobileNavItems = () => (
+    <>
+      <NavigationItem href="/" label="首页" />
+      <NavigationItem href="/Manuscript" label="实施底稿" />
+      <NavigationItem 
+        href="/services" 
+        label="服务" 
+        permission={[
+          UserPermission.VIEW_SERVICES,
+          UserPermission.ACCESS_DATABASE,
+          UserPermission.ACCESS_MINIO,
+          UserPermission.ACCESS_FILE_DOWNLOADS
+        ]} 
+      />
+      <NavigationItem href="/forum" label="论坛" permission={UserPermission.VIEW_FORUM} />
+    </>
+  );
 
   return (
     <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-sm border-b border-border/40 z-10 site-navbar shadow-sm">
@@ -197,16 +206,8 @@ const Navbar = () => {
                 <div className="p-4 border-b border-border/20">
                   <SheetTitle className="text-left text-primary/90">菜单导航</SheetTitle>
                 </div>
-                <div className="p-4 flex flex-col space-y-1">
-                  {mobileNavItems.map((item) => (
-                    <NavigationItem
-                      key={item.href}
-                      href={item.href}
-                      label={item.label}
-                      permission={item.permission}
-                      className="py-2 hover:translate-x-1"
-                    />
-                  ))}
+                <div className="p-4 flex flex-col space-y-2">
+                  <MobileNavItems />
                 </div>
               </SheetContent>
             </Sheet>

@@ -5,6 +5,11 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from '@/store'; // 导入Zustand状态
 
+// 在文件顶部，添加全局类型扩展
+interface Window {
+  __fetchingPermissions?: boolean;
+}
+
 // 用户类型定义
 export interface User {
   id: string;
@@ -47,6 +52,20 @@ interface AuthContextType {
 // 创建认证上下文
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// 在文件开头添加debounce函数防止频繁调用API
+const debounceMap = new Map<string, NodeJS.Timeout>();
+
+function debounce(key: string, fn: () => void, delay: number) {
+  if (debounceMap.has(key)) {
+    clearTimeout(debounceMap.get(key));
+  }
+  const timeoutId = setTimeout(() => {
+    fn();
+    debounceMap.delete(key);
+  }, delay);
+  debounceMap.set(key, timeoutId);
+}
+
 // 认证提供者组件的内部组件
 function AuthProviderContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -64,69 +83,128 @@ function AuthProviderContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log("AuthProvider - Session状态:", status, "用户:", session?.user);
     
-    if (status === "authenticated" && session?.user) {
-      const sessionUser = session.user as ExtendedUser;
-      // 将next-auth用户数据转换为Zustand用户数据
+    if (session?.user && status === "authenticated") {
+      // 构建基本用户对象
       const zustandUser: any = {
-        id: sessionUser.id || sessionUser.email || 'user-id', // 优先使用user.id
-        name: sessionUser.name || '',
-        email: sessionUser.email || '',
+        id: session.user.id || "",
+        name: session.user.name || "",
+        email: session.user.email || "",
+        roles: [],
+        permissions: []
       };
       
-      // 如果session包含roles，将权限信息添加到Zustand用户对象
-      if (sessionUser.roles && sessionUser.roles.length > 0) {
-        // 提取所有权限到一个数组
+      // 检查会话中是否已有角色和权限
+      if (session.user.roles && session.user.roles.length > 0) {
+        zustandUser.roles = session.user.roles;
+        
+        // 从角色中提取权限
         const permissions: string[] = [];
-        sessionUser.roles.forEach(roleObj => {
-          if (roleObj.role && Array.isArray(roleObj.role.permissions)) {
-            permissions.push(...roleObj.role.permissions);
+        session.user.roles.forEach(role => {
+          if (role.role.permissions) {
+            permissions.push(...role.role.permissions);
           }
         });
+        zustandUser.permissions = [...new Set(permissions)]; // 去除重复权限
         
-        // 添加角色和权限到Zustand用户对象
-        zustandUser.roles = sessionUser.roles;
-        zustandUser.permissions = [...new Set(permissions)];
-        
-        console.log("AuthProvider - 已登录，更新Zustand用户(带权限):", 
-          {
-            ...zustandUser, 
-            hasAdminAccess: permissions.includes('admin_access')
-          }
-        );
-      } else {
+        console.log("AuthProvider - 已登录，更新Zustand用户(有权限):", { 
+          用户: session.user.name, 
+          权限数量: zustandUser.permissions.length,
+          hasAdminAccess: zustandUser.permissions.includes('admin_access')
+        });
+      } 
+      else {
         console.log("AuthProvider - 已登录，更新Zustand用户(无权限):", zustandUser);
         
-        // 如果会话中没有权限信息，尝试从API获取
-        (async () => {
-          try {
-            const response = await fetch('/api/auth/debug');
-            if (response.ok) {
-              const data = await response.json();
+        // 检查本地缓存是否已经有权限信息
+        const cachedPermissions = localStorage.getItem('cached_permissions');
+        const cachedTimestamp = localStorage.getItem('cached_permissions_timestamp');
+        const CACHE_VALID_DURATION = 60000; // 缓存有效期1分钟
+        
+        // 如果缓存有效，直接使用缓存数据
+        if (cachedPermissions && cachedTimestamp && 
+            (Date.now() - parseInt(cachedTimestamp)) < CACHE_VALID_DURATION) {
+          
+          const permissions = JSON.parse(cachedPermissions);
+          console.log("AuthProvider - 使用缓存权限:", permissions.length);
+          
+          // 如果会话中没有权限信息，尝试从API获取(使用debounce限制频率)
+          debounce('auth_sync', async () => {
+            try {
+              console.log("AuthProvider - 异步刷新权限...");
+              const response = await fetch('/api/auth/debug', {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache' }
+              });
               
-              if (data.authenticated && data.permissions && data.permissions.length > 0) {
-                // 构建包含完整权限的用户对象
-                zustandUser.roles = data.roles?.map((r: any) => ({
-                  role: {
-                    name: r.roleName,
-                    permissions: r.permissions || []
-                  }
-                })) || [];
-                zustandUser.permissions = data.permissions || [];
+              if (response.ok) {
+                const data = await response.json();
                 
-                // 更新NextAuth会话，确保包含角色信息
-                await update({
-                  roles: zustandUser.roles
+                if (data.authenticated && data.permissions) {
+                  // 缓存权限
+                  localStorage.setItem('cached_permissions', JSON.stringify(data.permissions));
+                  localStorage.setItem('cached_permissions_timestamp', Date.now().toString());
+                  
+                  console.log("AuthProvider - 权限缓存已更新");
+                }
+              }
+            } catch (error) {
+              console.error("异步刷新权限失败:", error);
+            }
+          }, 10000); // 10秒防抖
+        } 
+        else {
+          // 无缓存或缓存失效，使用一次性调用获取权限
+          // 使用引用跟踪API调用状态，避免重复调用
+          if (!window.__fetchingPermissions) {
+            window.__fetchingPermissions = true;
+            
+            (async () => {
+              try {
+                console.log("AuthProvider - 从API获取权限...");
+                const response = await fetch('/api/auth/debug', {
+                  cache: 'no-store',
+                  headers: { 'Cache-Control': 'no-cache' }
                 });
                 
-                console.log("AuthProvider - API权限同步完成:", 
-                  {hasAdminAccess: data.permissions.includes('admin_access')}
-                );
+                if (response.ok) {
+                  const data = await response.json();
+                  
+                  if (data.authenticated && data.permissions) {
+                    // 缓存权限数据
+                    localStorage.setItem('cached_permissions', JSON.stringify(data.permissions));
+                    localStorage.setItem('cached_permissions_timestamp', Date.now().toString());
+                    
+                    // 构建包含完整权限的用户对象
+                    zustandUser.roles = data.roles?.map((r: any) => ({
+                      role: {
+                        name: r.roleName,
+                        permissions: r.permissions || []
+                      }
+                    })) || [];
+                    zustandUser.permissions = data.permissions || [];
+                    
+                    // 更新NextAuth会话
+                    await update({
+                      roles: zustandUser.roles
+                    });
+                    
+                    // 更新Zustand状态
+                    zustandLogin(zustandUser);
+                    
+                    console.log("AuthProvider - API权限同步完成:", { 
+                      权限数量: data.permissions.length,
+                      hasAdminAccess: data.permissions.includes('admin_access')
+                    });
+                  }
+                }
+              } catch (error) {
+                console.error("获取权限失败:", error);
+              } finally {
+                window.__fetchingPermissions = false;
               }
-            }
-          } catch (error) {
-            console.error("获取权限失败:", error);
+            })();
           }
-        })();
+        }
       }
       
       // 更新Zustand状态
@@ -192,13 +270,12 @@ function AuthProviderContent({ children }: { children: React.ReactNode }) {
             
             // 更新NextAuth会话，确保包含角色信息
             await update({
-              roles: data.roles?.map((r: {roleName: string; permissions: string[]}) => ({
-                role: {
-                  name: r.roleName,
-                  permissions: r.permissions || []
-                }
-              }))
+              roles: fullUser.roles
             });
+            
+            // 强制再次更新确保权限被正确同步
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await update();
             
             console.log("权限同步完成，包含角色和权限:", data.roles);
           }

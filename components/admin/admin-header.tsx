@@ -46,7 +46,7 @@ export function AdminHeader() {
   };
 
   return shouldRender ? (
-    <header className="h-16 border-b flex items-center justify-between px-6 bg-gradient-to-r from-background to-muted/20 shadow-sm">
+    <header className="h-14 border-b flex items-center justify-between px-6 bg-gradient-to-r from-background to-muted/20 shadow-sm">
       <div className="flex-1">
         <h1 className="text-lg font-semibold flex items-center">
           <span className="mr-2 text-primary/70">👋</span>

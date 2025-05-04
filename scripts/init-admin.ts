@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { ROLES, Permission } from "../lib/permissions";
+import { ADMIN_ROLES } from "../lib/permissions";
 
 const prisma = new PrismaClient();
 
@@ -13,57 +13,57 @@ async function main() {
     
     // 超级管理员角色
     const superAdminRole = await prisma.role.upsert({
-      where: { name: ROLES.SUPER_ADMIN.name },
+      where: { name: ADMIN_ROLES.SUPER_ADMIN.name },
       update: { 
-        permissions: ROLES.SUPER_ADMIN.permissions,
-        description: ROLES.SUPER_ADMIN.description 
+        permissions: ADMIN_ROLES.SUPER_ADMIN.permissions,
+        description: ADMIN_ROLES.SUPER_ADMIN.description 
       },
       create: {
-        name: ROLES.SUPER_ADMIN.name,
-        permissions: ROLES.SUPER_ADMIN.permissions,
-        description: ROLES.SUPER_ADMIN.description
+        name: ADMIN_ROLES.SUPER_ADMIN.name,
+        permissions: ADMIN_ROLES.SUPER_ADMIN.permissions,
+        description: ADMIN_ROLES.SUPER_ADMIN.description
       }
     });
     
     // 内容管理员角色
     const contentManagerRole = await prisma.role.upsert({
-      where: { name: ROLES.CONTENT_MANAGER.name },
+      where: { name: ADMIN_ROLES.CONTENT_MANAGER.name },
       update: { 
-        permissions: ROLES.CONTENT_MANAGER.permissions,
-        description: ROLES.CONTENT_MANAGER.description 
+        permissions: ADMIN_ROLES.CONTENT_MANAGER.permissions,
+        description: ADMIN_ROLES.CONTENT_MANAGER.description 
       },
       create: {
-        name: ROLES.CONTENT_MANAGER.name,
-        permissions: ROLES.CONTENT_MANAGER.permissions,
-        description: ROLES.CONTENT_MANAGER.description
+        name: ADMIN_ROLES.CONTENT_MANAGER.name,
+        permissions: ADMIN_ROLES.CONTENT_MANAGER.permissions,
+        description: ADMIN_ROLES.CONTENT_MANAGER.description
       }
     });
     
     // 用户管理员角色
     const userManagerRole = await prisma.role.upsert({
-      where: { name: ROLES.USER_MANAGER.name },
+      where: { name: ADMIN_ROLES.USER_MANAGER.name },
       update: { 
-        permissions: ROLES.USER_MANAGER.permissions,
-        description: ROLES.USER_MANAGER.description 
+        permissions: ADMIN_ROLES.USER_MANAGER.permissions,
+        description: ADMIN_ROLES.USER_MANAGER.description 
       },
       create: {
-        name: ROLES.USER_MANAGER.name,
-        permissions: ROLES.USER_MANAGER.permissions,
-        description: ROLES.USER_MANAGER.description
+        name: ADMIN_ROLES.USER_MANAGER.name,
+        permissions: ADMIN_ROLES.USER_MANAGER.permissions,
+        description: ADMIN_ROLES.USER_MANAGER.description
       }
     });
     
-    // 普通管理员角色
-    const moderatorRole = await prisma.role.upsert({
-      where: { name: ROLES.MODERATOR.name },
+    // 资源管理员角色
+    const resourceManagerRole = await prisma.role.upsert({
+      where: { name: ADMIN_ROLES.RESOURCE_MANAGER.name },
       update: { 
-        permissions: ROLES.MODERATOR.permissions,
-        description: ROLES.MODERATOR.description 
+        permissions: ADMIN_ROLES.RESOURCE_MANAGER.permissions,
+        description: ADMIN_ROLES.RESOURCE_MANAGER.description 
       },
       create: {
-        name: ROLES.MODERATOR.name,
-        permissions: ROLES.MODERATOR.permissions,
-        description: ROLES.MODERATOR.description
+        name: ADMIN_ROLES.RESOURCE_MANAGER.name,
+        permissions: ADMIN_ROLES.RESOURCE_MANAGER.permissions,
+        description: ADMIN_ROLES.RESOURCE_MANAGER.description
       }
     });
     

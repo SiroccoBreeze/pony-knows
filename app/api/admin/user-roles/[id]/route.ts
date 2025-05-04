@@ -12,6 +12,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // 确保提前解析params.id
+    const roleId = params.id;
+    
     // 检查权限
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -33,7 +36,7 @@ export async function GET(
 
     // 获取角色详情
     const role = await prisma.role.findUnique({
-      where: { id: params.id }
+      where: { id: roleId }
     });
 
     if (!role) {
@@ -61,6 +64,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    // 确保提前解析params.id
+    const roleId = params.id;
+    
     // 检查权限
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -105,7 +111,7 @@ export async function PUT(
 
     // 检查角色是否存在
     const existingRole = await prisma.role.findUnique({
-      where: { id: params.id }
+      where: { id: roleId }
     });
 
     if (!existingRole) {
@@ -117,7 +123,7 @@ export async function PUT(
       const nameExists = await prisma.role.findFirst({
         where: {
           name,
-          id: { not: params.id }
+          id: { not: roleId }
         }
       });
 
@@ -131,7 +137,7 @@ export async function PUT(
 
     // 更新角色
     const updatedRole = await prisma.role.update({
-      where: { id: params.id },
+      where: { id: roleId },
       data: {
         name,
         description,
@@ -167,6 +173,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    // 确保提前解析params.id
+    const roleId = params.id;
+    
     // 检查权限
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -188,7 +197,7 @@ export async function DELETE(
 
     // 检查角色是否存在
     const role = await prisma.role.findUnique({
-      where: { id: params.id }
+      where: { id: roleId }
     });
 
     if (!role) {
@@ -197,7 +206,7 @@ export async function DELETE(
 
     // 检查是否有用户使用此角色
     const usersWithRole = await prisma.userRole.count({
-      where: { roleId: params.id }
+      where: { roleId: roleId }
     });
 
     if (usersWithRole > 0) {
@@ -209,7 +218,7 @@ export async function DELETE(
 
     // 删除角色
     await prisma.role.delete({
-      where: { id: params.id }
+      where: { id: roleId }
     });
 
     // 记录管理员操作日志
@@ -217,7 +226,7 @@ export async function DELETE(
       userId: session.user.id,
       action: '删除',
       resource: '用户角色',
-      resourceId: params.id,
+      resourceId: roleId,
       details: { deletedRole: role }
     });
 

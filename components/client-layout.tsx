@@ -5,20 +5,19 @@ import Navbar from "@/components/Navbar";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import Footer from "@/components/Footer";
 import { useEffect } from "react";
-import { AdminPermission } from "@/lib/permissions";
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith('/auth');
   const isAdminPage = pathname?.startsWith('/admin');
-  const { hasAdminPermission, isLoading } = useAuthPermissions();
+  const { permissions } = useAuthPermissions();
   
-  // 检测用户是否有管理员权限
-  const isAdmin = hasAdminPermission(AdminPermission.ADMIN_ACCESS);
+  // 检测用户是否有管理员权限 - 直接使用字符串形式
+  const isAdmin = permissions.includes("admin_access");
 
   // 使用CSS类来控制导航栏显示
   useEffect(() => {
-    if (isAdminPage && isAdmin && !isLoading) {
+    if (isAdminPage && isAdmin) {
       // 管理员访问管理页面时，添加admin-mode类
       document.body.classList.add('admin-mode');
     } else {
@@ -30,7 +29,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     return () => {
       document.body.classList.remove('admin-mode');
     };
-  }, [isAdminPage, isAdmin, isLoading]);
+  }, [isAdminPage, isAdmin]);
 
   // 登录页面始终隐藏导航和页脚
   const hideNavbarAndFooter = isAuthPage;

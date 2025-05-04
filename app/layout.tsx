@@ -7,9 +7,13 @@ import { ClientLayout } from "../components/client-layout";
 import { Providers } from "./providers";
 import HandlePermissionSync from "@/components/handle-permission-sync";
 import { Toaster } from "@/components/ui/toaster";
+import { LoaderProvider } from "@/contexts/loader-context";
+import { LoadingOverlay } from "@/components/loading-overlay";
+import { ThemeProvider } from "@/components/ui/theme-provider";
 
 const inter = Inter({
   subsets: ["latin"],
+  display: "swap",
   variable: "--font-inter",
 });
 
@@ -20,9 +24,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
@@ -33,11 +37,16 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col`}>
-        <Providers>
-          <ClientLayout>{children}</ClientLayout>
-          <HandlePermissionSync />
-          <Toaster />
-        </Providers>
+        <LoaderProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <LoadingOverlay />
+            <Providers>
+              <ClientLayout>{children}</ClientLayout>
+              <HandlePermissionSync />
+              <Toaster />
+            </Providers>
+          </ThemeProvider>
+        </LoaderProvider>
       </body>
     </html>
   );

@@ -1,37 +1,65 @@
 "use client";
 
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
-import { Permission } from "@/lib/permissions";
 import { notFound } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function ServicesLayout({ children }: { children: React.ReactNode }) {
-  const { hasPermission, isLoading } = useAuthPermissions();
-  const [showContent, setShowContent] = useState(false);
+  const { permissions, isLoading } = useAuthPermissions();
+  const [hasChecked, setHasChecked] = useState(false);
+  const permissionCheckTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  // 确保组件卸载时清除定时器
+  useEffect(() => {
+    return () => {
+      if (permissionCheckTimer.current) {
+        clearTimeout(permissionCheckTimer.current);
+      }
+    };
+  }, []);
   
   // 检查用户是否有权访问服务页面
   useEffect(() => {
-    // 如果权限还在加载中，等待加载完成
+    // 避免重复检查
+    if (hasChecked) return;
+    
+    // 如果权限仍在加载中，等待
     if (isLoading) return;
     
-    // 检查用户是否有服务访问权限
-    if (hasPermission(Permission.ACCESS_SERVICES)) {
-      setShowContent(true);
-    } else {
+    // 确保权限已加载完成，使用小延迟
+    permissionCheckTimer.current = setTimeout(() => {
+      // 设置为已检查
+      setHasChecked(true);
+      
+      // 检查用户是否有任一服务相关权限 - 使用字符串形式比较
+      const hasServiceAccess = permissions.includes("view_services");
+      const hasDatabaseAccess = permissions.includes("access_database");
+      const hasMinioAccess = permissions.includes("access_minio");
+      const hasFileDownloadAccess = permissions.includes("access_file_downloads");
+      
+      // 任一服务权限即可访问服务页面
+      const hasAnyServicePermission = hasServiceAccess || hasDatabaseAccess || 
+                                     hasMinioAccess || hasFileDownloadAccess;
+      
+      console.log("[ServicesLayout] 服务权限检查(延迟执行):", {
+        hasAccess: hasAnyServicePermission,
+        permissions: permissions,
+        permissionsCount: permissions.length
+      });
+      
       // 用户没有权限访问服务页面，显示404页面
-      console.log("[ServicesLayout] 用户没有服务页面访问权限");
-      notFound();
-    }
-  }, [hasPermission, isLoading]);
+      if (!hasAnyServicePermission) {
+        console.log("[ServicesLayout] 用户没有服务页面访问权限");
+        notFound();
+      }
+    }, 500); // 500ms延迟，确保权限已完全同步
+  }, [permissions, hasChecked, isLoading]);
   
-  // 在加载状态或未确认权限时显示加载界面
-  if (isLoading || !showContent) {
+  // 权限检查完成前显示简单的加载指示
+  if (!hasChecked) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-          <p className="mt-2">正在加载服务页面...</p>
-        </div>
+      <div className="p-4">
+        <p className="text-sm text-muted-foreground">权限验证中...</p>
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { Permission, ROLES } from "../lib/permissions";
+import { Permission, ADMIN_ROLES } from "../lib/permissions";
 
 const prisma = new PrismaClient();
 
@@ -11,15 +11,15 @@ async function main() {
     // 1. 确保超级管理员角色存在并包含所有权限
     console.log("检查并更新超级管理员角色...");
     const superAdminRole = await prisma.role.upsert({
-      where: { name: ROLES.SUPER_ADMIN.name },
+      where: { name: ADMIN_ROLES.SUPER_ADMIN.name },
       update: { 
         permissions: Object.values(Permission),
-        description: ROLES.SUPER_ADMIN.description 
+        description: ADMIN_ROLES.SUPER_ADMIN.description 
       },
       create: {
-        name: ROLES.SUPER_ADMIN.name,
+        name: ADMIN_ROLES.SUPER_ADMIN.name,
         permissions: Object.values(Permission),
-        description: ROLES.SUPER_ADMIN.description
+        description: ADMIN_ROLES.SUPER_ADMIN.description
       }
     });
     
@@ -46,7 +46,7 @@ async function main() {
       
       // 检查用户是否已经有超级管理员角色
       const hasAdminRole = user.userRoles.some(
-        userRole => userRole.role.name === ROLES.SUPER_ADMIN.name
+        userRole => userRole.role.name === ADMIN_ROLES.SUPER_ADMIN.name
       );
       
       if (hasAdminRole) {
