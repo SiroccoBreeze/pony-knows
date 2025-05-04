@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Search, Plus, Edit, Trash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 
 interface Tag {
@@ -53,7 +53,7 @@ export default function TagsPage() {
   });
 
   const { toast } = useToast();
-  const { hasPermission } = useAuthPermissions();
+  const { hasAdminPermission } = useAuthPermissions();
 
   // 获取标签数据
   useEffect(() => {
@@ -173,7 +173,7 @@ export default function TagsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">标签管理</h1>
         
-        {hasPermission(Permission.ADMIN_ACCESS) && (
+        {hasAdminPermission(AdminPermission.ADMIN_ACCESS) && (
           <Button onClick={handleAddTag}>
             <Plus className="mr-2 h-4 w-4" />
             添加标签

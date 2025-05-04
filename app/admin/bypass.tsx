@@ -5,15 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-
-// 临时定义权限枚举
-enum Permission {
-  ADMIN_ACCESS = 'admin_access',
-  VIEW_USERS = 'view_users',
-  EDIT_USERS = 'edit_user',
-  DELETE_USERS = 'delete_user',
-  CREATE_USERS = 'create_user'
-}
+import { AdminPermission } from '@/lib/permissions';
 
 export default function BypassPage() {
   const { data: session } = useSession();
@@ -23,11 +15,11 @@ export default function BypassPage() {
 
   // 管理员必要权限列表
   const adminPermissions = [
-    Permission.ADMIN_ACCESS,
-    Permission.VIEW_USERS,
-    Permission.EDIT_USERS,
-    Permission.DELETE_USERS,
-    Permission.CREATE_USERS,
+    AdminPermission.ADMIN_ACCESS,
+    AdminPermission.VIEW_USERS,
+    AdminPermission.EDIT_USER,
+    AdminPermission.DELETE_USER,
+    AdminPermission.CREATE_USER,
     'admin_access',
     'admin.*',
   ];

@@ -2,7 +2,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 
 const prisma = new PrismaClient();
 
@@ -181,8 +181,8 @@ export async function GET(request: Request) {
         });
       }
       
-      const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
-      const canViewAllPosts = userPermissions.includes(Permission.VIEW_POSTS);
+      const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
+      const canViewAllPosts = userPermissions.includes(AdminPermission.VIEW_POSTS);
       
       // 如果不是管理员请求/管理员权限/作者本人查看，只显示已审核通过的帖子
       if (!isAdminRequest && !isSuperAdmin && !isAdmin && !canViewAllPosts && 

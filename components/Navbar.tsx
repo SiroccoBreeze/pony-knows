@@ -3,16 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { Button } from "./ui/button";
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
-import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle"
 import { ThemeToggleColor } from "@/components/theme-toggle-color"
 import { UserMenu } from "@/components/auth/user-menu";
@@ -23,6 +13,9 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import axios from "axios";
+import { MainNavigation } from "./main-navigation";
+import { NavigationItem } from "./navigation-item";
+import { UserPermission } from "@/lib/permissions";
 
 // 通知项目类型
 interface NotificationItem {
@@ -104,66 +97,26 @@ const Navbar = () => {
   const mobileNavItems = [
     { href: "/", label: "首页" },
     { href: "/Manuscript", label: "实施底稿" },
-    { href: "/services", label: "服务" },
-    { href: "/services/minio", label: "网盘服务" },
-    { href: "/forum", label: "论坛" },
+    { href: "/services", label: "服务", permission: UserPermission.VIEW_SERVICES },
+    { href: "/services/minio", label: "网盘服务", permission: UserPermission.ACCESS_MINIO },
+    { href: "/services/file-links", label: "资源下载", permission: UserPermission.ACCESS_FILE_DOWNLOADS },
+    { href: "/forum", label: "论坛", permission: UserPermission.VIEW_FORUM },
   ];
 
   return (
-    <nav className="fixed top-0 w-full bg-background border-b z-10">
+    <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-sm border-b border-border/40 z-10 site-navbar shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link href="/" className="text-xl font-bold">
+            <Link href="/" className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent transition-all duration-300 hover:scale-105">
               PonyKnows
             </Link>
           </div>
 
           {/* 桌面端导航菜单 */}
           <div className="hidden md:block">
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link href="/" className={navigationMenuTriggerStyle()}>
-                      首页
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link href="/Manuscript" className={navigationMenuTriggerStyle()}>
-                      实施底稿
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger>服务</NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2">
-                      <ListItem href="/services" title="全部服务">
-                        查看我们提供的所有服务内容
-                      </ListItem>
-                      <ListItem href="/services/database" title="数据库结构">
-                        查询和浏览数据库表结构信息
-                      </ListItem>
-                      <ListItem href="/services/minio" title="网盘服务">
-                        基于MinIO的对象存储服务
-                      </ListItem>
-                    </ul>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link href="/forum" className={navigationMenuTriggerStyle()}>
-                      论坛
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
+            <MainNavigation />
           </div>
 
           {/* 登录按钮和主题切换 */}
@@ -173,19 +126,19 @@ const Navbar = () => {
             {isLoggedIn && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="relative hover:bg-primary/10 rounded-full transition-colors">
+                    <Bell className="h-5 w-5 text-primary/70" />
                     {unreadCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]">
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] bg-primary text-primary-foreground">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </Badge>
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72">
-                  <div className="p-2">
+                <DropdownMenuContent align="end" className="w-72 border border-border/50 rounded-xl shadow-lg">
+                  <div className="p-3">
                     <div className="flex justify-between items-center mb-2">
-                      <h4 className="text-sm font-medium">通知消息</h4>
+                      <h4 className="text-sm font-medium text-primary/90">通知消息</h4>
                       <Link href="/user/messages" className="text-xs text-primary hover:underline">
                         查看全部
                       </Link>
@@ -193,14 +146,14 @@ const Navbar = () => {
                     <div className="space-y-2">
                       {notificationItems.length > 0 ? (
                         notificationItems.map((item: NotificationItem) => (
-                          <div key={item.id} className="bg-muted/50 p-2 rounded-md text-xs">
+                          <div key={item.id} className="bg-muted/50 hover:bg-muted/80 p-2 rounded-md text-xs transition-colors">
                             <p className="font-medium">{item.title}</p>
                             <p className="text-muted-foreground mt-1">{item.content}</p>
                             <p className="text-muted-foreground text-right text-[10px] mt-1">{item.time}</p>
                           </div>
                         ))
                       ) : (
-                        <div className="text-center py-2 text-xs text-muted-foreground">
+                        <div className="text-center py-4 text-xs text-muted-foreground">
                           暂无未读消息
                         </div>
                       )}
@@ -222,10 +175,10 @@ const Navbar = () => {
               <UserMenu user={user!} />
             ) : (
               <>
-                <Button variant="outline" asChild>
+                <Button variant="outline" asChild className="rounded-full border-primary/20 hover:bg-primary/5 transition-colors">
                   <Link href="/auth/login">登录</Link>
                 </Button>
-                <Button asChild>
+                <Button asChild className="rounded-full transition-transform hover:scale-105">
                   <Link href="/auth/register">注册</Link>
                 </Button>
               </>
@@ -236,23 +189,25 @@ const Navbar = () => {
           <div className="md:hidden">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="md:hidden hover:bg-primary/10 transition-colors">
+                  <Menu className="h-5 w-5 text-primary/70" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <SheetTitle className="text-lg font-semibold mb-4">导航菜单</SheetTitle>
-                <nav className="flex flex-col space-y-4">
+              <SheetContent side="left" className="border-r border-border/50 p-0">
+                <div className="p-4 border-b border-border/20">
+                  <SheetTitle className="text-left text-primary/90">菜单导航</SheetTitle>
+                </div>
+                <div className="p-4 flex flex-col space-y-1">
                   {mobileNavItems.map((item) => (
-                    <Link
+                    <NavigationItem
                       key={item.href}
                       href={item.href}
-                      className="text-sm font-medium transition-colors hover:text-primary"
-                      onClick={() => setIsOpen(false)}>
-                      {item.label}
-                    </Link>
+                      label={item.label}
+                      permission={item.permission}
+                      className="py-2 hover:translate-x-1"
+                    />
                   ))}
-                </nav>
+                </div>
               </SheetContent>
             </Sheet>
           </div>
@@ -261,34 +216,5 @@ const Navbar = () => {
     </nav>
   );
 };
-
-// 辅助组件用于创建导航菜单项
-const ListItem = React.forwardRef<
-  React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a"> & {
-    title: string;
-  }
->(({ className, title, children, ...props }, ref) => {
-  return (
-    <li>
-      <NavigationMenuLink asChild>
-        <a
-          ref={ref}
-          className={cn(
-            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-            className
-          )}
-          {...props}
-        >
-          <div className="text-sm font-medium leading-none">{title}</div>
-          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-            {children}
-          </p>
-        </a>
-      </NavigationMenuLink>
-    </li>
-  );
-});
-ListItem.displayName = "ListItem";
 
 export default Navbar;

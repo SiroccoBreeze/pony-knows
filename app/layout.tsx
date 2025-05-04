@@ -6,6 +6,7 @@ import { themeScript } from "@/lib/theme-script";
 import { ClientLayout } from "../components/client-layout";
 import { Providers } from "./providers";
 import HandlePermissionSync from "@/components/handle-permission-sync";
+import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({
         <Providers>
           <ClientLayout>{children}</ClientLayout>
           <HandlePermissionSync />
+          <Toaster />
         </Providers>
       </body>
     </html>

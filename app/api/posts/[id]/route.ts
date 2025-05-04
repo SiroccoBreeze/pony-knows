@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";  // 直接从lib导入
 import prisma from "@/lib/prisma";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 
 // 扩展 Session 类型
 interface ExtendedSession {
@@ -145,8 +145,8 @@ export async function PATCH(
     const adminOverride = request.headers.get("X-Admin-Override") === "true";
     
     // 检查权限：用户必须拥有编辑帖子权限或是超级管理员
-    const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
-    const canEditPosts = userPermissions.includes(Permission.EDIT_POST);
+    const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
+    const canEditPosts = userPermissions.includes(AdminPermission.EDIT_POST);
 
     // 只允许管理员或超级管理员进行审核操作
     if (!canEditPosts && !isAdmin && !isSuperAdmin && !adminOverride) {
@@ -296,8 +296,8 @@ export async function PUT(
     
     // 检查权限：用户必须是帖子作者或拥有编辑帖子权限或是超级管理员
     const isAuthor = existingPost.authorId === session.user.id;
-    const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
-    const canEditPosts = userPermissions.includes(Permission.EDIT_POST);
+    const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
+    const canEditPosts = userPermissions.includes(AdminPermission.EDIT_POST);
 
     console.log("API - 权限检查:", {
       isAuthor,
@@ -307,7 +307,7 @@ export async function PUT(
       adminOverride,
       userId: session.user.id,
       authorId: existingPost.authorId,
-      editPostPermission: Permission.EDIT_POST
+      editPostPermission: AdminPermission.EDIT_POST
     });
 
     // 放宽权限检查，允许超级管理员编辑任何帖子
@@ -510,8 +510,8 @@ export async function DELETE(
     
     // 检查权限：用户必须是帖子作者或拥有删除帖子权限或是超级管理员
     const isAuthor = existingPost.authorId === session.user.id;
-    const isAdmin = userPermissions.includes(Permission.ADMIN_ACCESS);
-    const canDeletePosts = userPermissions.includes(Permission.DELETE_POST);
+    const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
+    const canDeletePosts = userPermissions.includes(AdminPermission.DELETE_POST);
 
     console.log("API - 权限检查:", {
       isAuthor,
@@ -521,7 +521,7 @@ export async function DELETE(
       adminOverride,
       userId: session.user.id,
       authorId: existingPost.authorId,
-      deletePostPermission: Permission.DELETE_POST
+      deletePostPermission: AdminPermission.DELETE_POST
     });
 
     // 放宽权限检查，允许超级管理员删除任何帖子

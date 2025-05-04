@@ -6,23 +6,24 @@ import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { notFound } from "next/navigation";
-
-// 超级管理员邮箱列表 - 这些邮箱的用户始终可以访问管理页面
-const ADMIN_EMAILS = ['admin@example.com'];
+import { AdminPermission } from "@/lib/permissions";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { isAdmin, isLoading, userPermissions, user } = useAuthPermissions();
+  const { hasAdminPermission, permissions, isLoading, isAuthenticated } = useAuthPermissions();
   const [showContent, setShowContent] = useState(false);
   
   // 统一的权限与导航管理
   useEffect(() => {
+    // 判断用户是否有管理员权限
+    const isAdmin = hasAdminPermission(AdminPermission.ADMIN_ACCESS);
+    
     // 打印调试信息
     console.log("[AdminLayout] 权限状态:", { 
       isAdmin, 
       isLoading, 
-      permissionsCount: userPermissions.length,
-      hasAdminAccess: userPermissions.includes('admin_access'),
-      email: user?.email,
+      permissionsCount: permissions.length,
+      hasAdminAccess: permissions.includes(AdminPermission.ADMIN_ACCESS),
+      isAuthenticated
     });
     
     // 只在加载完成后再做权限判断
@@ -34,22 +35,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // 如果是管理员，显示内容
     if (isAdmin) {
       console.log("[AdminLayout] 用户是管理员，允许访问");
+      
+      // 移除普通导航栏，管理员界面专注于管理功能
+      document.body.classList.add('admin-mode');
+      
       setShowContent(true);
       return;
     }
     
-    // 特殊处理：超级管理员邮箱始终可以访问
-    if (user?.email && ADMIN_EMAILS.includes(user.email)) {
-      console.log(`[AdminLayout] 超级管理员邮箱 ${user.email}，允许访问`);
-      setShowContent(true);
-      localStorage.setItem('admin_bypass', 'true');
-      return;
-    }
-    
-    // 检查是否有本地存储的绕过标记
+    // 特殊处理：检查是否有本地存储的绕过标记
     const bypass = localStorage.getItem('admin_bypass');
     if (bypass === 'true') {
       console.log("[AdminLayout] 发现本地绕过标记，允许访问");
+      
+      // 同样移除普通导航栏
+      document.body.classList.add('admin-mode');
+      
       setShowContent(true);
       return;
     }
@@ -57,14 +58,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // 只有当权限加载完成且确认没有权限时，才显示404
     if (!isLoading && !isAdmin) {
       console.log("[AdminLayout] 确认用户没有管理员权限，显示404页面", { 
-        权限总数: userPermissions.length,
-        拥有权限: userPermissions
+        权限总数: permissions.length,
+        拥有权限: permissions
       });
       
       // 使用notFound()函数显示404页面
       notFound();
     }
-  }, [isAdmin, isLoading, userPermissions, user]);
+    
+    // 组件卸载时移除类名
+    return () => {
+      document.body.classList.remove('admin-mode');
+    };
+  }, [hasAdminPermission, isLoading, permissions, isAuthenticated]);
   
   // 在加载状态或未确认权限时显示加载界面
   if (isLoading || !showContent) {
@@ -78,14 +84,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
   
-  // 渲染管理界面
+  // 渲染管理界面 - 未包含普通导航栏
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gradient-to-br from-background to-muted/20">
       <AdminSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader />
         <main className="flex-1 overflow-y-auto p-6">
-          {children}
+          <div className="container mx-auto max-w-6xl">
+            {children}
+          </div>
         </main>
       </div>
       <Toaster />

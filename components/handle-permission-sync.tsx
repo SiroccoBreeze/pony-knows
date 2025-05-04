@@ -65,9 +65,12 @@ export default function HandlePermissionSync() {
           const sessionHasAdminAccess = sessionPermissions.includes('admin_access');
           const apiHasAdminAccess = apiPermissions.includes('admin_access');
           
+          // 检查API中有但会话中没有的权限
+          const missingPermissions = apiPermissions.filter(p => !sessionPermissions.includes(p));
+          
           // 如果API返回的权限与会话中的权限不一致，需要同步
-          if (!sessionHasAdminAccess && apiHasAdminAccess) {
-            console.log('检测到权限不一致，需要同步');
+          if ((!sessionHasAdminAccess && apiHasAdminAccess) || missingPermissions.length > 0) {
+            console.log('检测到权限不一致，需要同步。缺少权限:', missingPermissions);
             setNeedsSync(true);
           } else {
             setNeedsSync(false);
@@ -125,7 +128,8 @@ export default function HandlePermissionSync() {
                   name: r.roleName,
                   permissions: r.permissions
                 }
-              }))
+              })),
+              permissions: data.permissions // 直接添加permissions到会话中
             });
           }
         }
@@ -174,7 +178,7 @@ export default function HandlePermissionSync() {
       <div className="max-w-md mx-auto bg-yellow-100 dark:bg-yellow-900 rounded-lg shadow-lg p-4">
         <h3 className="font-semibold text-sm mb-2">检测到权限同步问题</h3>
         <p className="text-xs mb-4">
-          您的会话数据与服务器上的权限数据不一致。数据库中您有管理员权限，但会话中无法识别。
+          您的会话数据与服务器上的权限数据不一致。服务器中包含新的权限设置，但您的会话中尚未更新。请刷新会话以获取最新权限。
         </p>
         <div className="flex gap-2">
           <Button 

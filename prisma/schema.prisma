@@ -211,3 +211,16 @@ model PostImage {
 
   @@index([postId])
 }
+
+// 外部链接表
+model ExternalLink {
+  id          String   @id @default(uuid())
+  title       String   // 链接标题
+  url         String   // 链接URL地址
+  description String?  // 链接描述
+  type        String   // 链接类型，例如：'quark'(夸克网盘)、'baidu'(百度网盘)、'other'(其他)
+  password    String?  // 提取码（如果有）
+  isActive    Boolean  @default(true) // 链接是否激活
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -41,7 +41,7 @@ export async function GET() {
     });
     
     // 检查是否有管理员权限
-    const hasAdminAccess = permissions.includes(Permission.ADMIN_ACCESS);
+    const hasAdminAccess = permissions.includes(AdminPermission.ADMIN_ACCESS);
     
     // 返回调试信息
     return NextResponse.json({

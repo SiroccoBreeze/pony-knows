@@ -2,7 +2,7 @@
 
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import { useSession } from "next-auth/react";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Server } from "lucide-react";
 import { useState } from "react";
@@ -28,7 +28,8 @@ interface ApiDebugResponse {
 
 export default function AuthDebugPage() {
   const { data: session, status, update } = useSession();
-  const { isAdmin, userPermissions, user, hasPermission } = useAuthPermissions();
+  const { isAdmin: isAdminFn, permissions: userPermissions, hasAdminPermission } = useAuthPermissions();
+  const isAdmin = isAdminFn();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [apiData, setApiData] = useState<ApiDebugResponse | null>(null);
   const [isLoadingApi, setIsLoadingApi] = useState(false);
@@ -85,7 +86,7 @@ export default function AuthDebugPage() {
         <h2 className="text-2xl font-semibold mb-4">会话状态</h2>
         <p className="mb-2"><span className="font-semibold">状态:</span> {status}</p>
         <p className="mb-2"><span className="font-semibold">isAdmin:</span> {isAdmin ? '是' : '否'}</p>
-        <p className="mb-2"><span className="font-semibold">是否拥有ADMIN_ACCESS权限:</span> {hasPermission(Permission.ADMIN_ACCESS) ? '是' : '否'}</p>
+        <p className="mb-2"><span className="font-semibold">是否拥有ADMIN_ACCESS权限:</span> {hasAdminPermission(AdminPermission.ADMIN_ACCESS) ? '是' : '否'}</p>
       </div>
       
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
@@ -98,7 +99,7 @@ export default function AuthDebugPage() {
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
         <h2 className="text-2xl font-semibold mb-4">用户信息</h2>
         <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded overflow-auto">
-          {JSON.stringify(user, null, 2)}
+          {JSON.stringify(session?.user, null, 2)}
         </pre>
       </div>
       

@@ -6,7 +6,31 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* 管理员模式下隐藏网站导航栏 */
+body.admin-mode nav.site-navbar {
+  display: none;
+}
 
+/* 管理员模式下隐藏网站页脚 */
+body.admin-mode footer.site-footer {
+  display: none;
+}
+
+/* 管理员模式下的全局样式 */
+body.admin-mode {
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* 管理员侧边栏动画 */
+@keyframes slideIn {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.admin-menu-item {
+  animation: slideIn 0.3s ease-out forwards;
+}
 
 @layer base {
   :root {
@@ -239,8 +263,6 @@ body {
 
 }
 
-
-
 @layer base {
   * {
     @apply border-border;
@@ -249,8 +271,6 @@ body {
     @apply bg-background text-foreground;
   }
 }
-
-
 
 @layer base {
   * {

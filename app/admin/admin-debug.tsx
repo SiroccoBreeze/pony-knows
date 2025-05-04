@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 
 export default function AdminDebugPage() {
   const { data: session, status, update } = useSession();
@@ -93,7 +93,7 @@ export default function AdminDebugPage() {
                 <p>
                   拥有admin_access: {
                     session?.user?.roles?.some(r => 
-                      r.role.permissions?.includes(Permission.ADMIN_ACCESS)
+                      r.role.permissions?.includes(AdminPermission.ADMIN_ACCESS)
                     ) ? '是' : '否'
                   }
                 </p>
@@ -107,7 +107,7 @@ export default function AdminDebugPage() {
                 <p>权限数量: {apiData?.permissions?.length || 0}</p>
                 <p>
                   拥有admin_access: {
-                    apiData?.permissions?.includes(Permission.ADMIN_ACCESS)
+                    apiData?.permissions?.includes(AdminPermission.ADMIN_ACCESS)
                       ? '是' : '否'
                   }
                 </p>

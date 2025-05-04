@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -16,8 +16,8 @@ export default function AdminDebugPage() {
   const { 
     isAdmin, 
     isLoading, 
-    userPermissions, 
-    hasPermission 
+    permissions: userPermissions, 
+    hasAdminPermission 
   } = useAuthPermissions();
   
   // 从API获取最新权限
@@ -87,7 +87,7 @@ export default function AdminDebugPage() {
             <dd>{isAdmin ? "是" : "否"}</dd>
             
             <dt className="font-semibold">有admin_access权限:</dt>
-            <dd>{hasPermission(Permission.ADMIN_ACCESS) ? "是" : "否"}</dd>
+            <dd>{hasAdminPermission(AdminPermission.ADMIN_ACCESS) ? "是" : "否"}</dd>
             
             <dt className="font-semibold">权限总数:</dt>
             <dd>{userPermissions.length}</dd>
