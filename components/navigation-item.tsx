@@ -29,7 +29,7 @@ export function NavigationItem({
   icon
 }: NavigationItemProps) {
   const pathname = usePathname();
-  const { hasPermission, hasPermissionWithServerCheck } = useAuthPermissions();
+  const { hasPermission } = useAuthPermissions();
   const [isVisible, setIsVisible] = useState(!permission);
   const isActive = pathname === href || pathname?.startsWith(`${href}/`);
   const hasCheckedPermission = useRef(false);
@@ -42,13 +42,16 @@ export function NavigationItem({
     }
   }, [permission, label]);
   
-  // 初始时先使用客户端缓存检查权限，然后再进行服务器检查
+  // 使用客户端权限检查
   useEffect(() => {
     // 没有权限要求时直接显示
     if (!permission) {
       setIsVisible(true);
       return;
     }
+    
+    // 标记为已检查
+    hasCheckedPermission.current = true;
     
     // 进行客户端权限检查
     if (Array.isArray(permission)) {
@@ -62,38 +65,7 @@ export function NavigationItem({
       console.log(`[NavigationItem] ${label} 客户端权限检查(单个):`, hasPerm, permission);
       setIsVisible(hasPerm);
     }
-    
-    // 只有在未通过客户端检查时才进行服务器检查
-    if (!isVisible && !hasCheckedPermission.current) {
-      const checkPermission = async () => {
-        try {
-          let serverHasPermission = false;
-          
-          if (Array.isArray(permission)) {
-            for (const p of permission) {
-              const hasAccess = await hasPermissionWithServerCheck(p);
-              if (hasAccess) {
-                serverHasPermission = true;
-                console.log(`[NavigationItem] ${label} 服务器权限检查成功:`, p);
-                break;
-              }
-            }
-          } else {
-            serverHasPermission = await hasPermissionWithServerCheck(permission);
-            console.log(`[NavigationItem] ${label} 服务器权限检查:`, serverHasPermission);
-          }
-          
-          setIsVisible(serverHasPermission);
-        } catch (err) {
-          console.error(`[NavigationItem] ${label} 权限检查失败:`, err);
-        }
-        
-        hasCheckedPermission.current = true;
-      };
-      
-      checkPermission();
-    }
-  }, [hasPermission, hasPermissionWithServerCheck, permission, label, isVisible]);
+  }, [hasPermission, permission, label]);
   
   // 权限检查已完成，但无权访问
   if (!isVisible) {

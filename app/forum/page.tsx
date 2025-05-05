@@ -11,6 +11,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useDebounce } from "@/hooks/use-debounce";
 import { isMobileDevice } from "@/lib/utils";
+import { useAuthPermissions } from "@/hooks/use-auth-permissions";
+import { UserPermission } from "@/lib/permissions";
 
 // 定义帖子和标签接口
 interface Post {
@@ -49,6 +51,7 @@ export default function ForumPage() {
   const searchParams = useSearchParams();
   const selectedTag = searchParams.get("tag");
   const [isMobile, setIsMobile] = useState(false);
+  const { hasPermission } = useAuthPermissions();
 
   useEffect(() => {
     setIsMobile(isMobileDevice());
@@ -196,7 +199,7 @@ export default function ForumPage() {
                 </button>
               )}
             </div>
-            {!isMobile && (
+            {!isMobile && hasPermission(UserPermission.CREATE_TOPIC) && (
               <Button asChild variant="default" size="lg" className="gap-2">
                 <Link href="/forum/new">
                   发布新帖
@@ -205,8 +208,8 @@ export default function ForumPage() {
             )}
           </div>
 
-          {/* 移动端提示 */}
-          {isMobile && (
+          {/* 移动端提示 - 只有拥有CREATE_TOPIC权限的用户才显示 */}
+          {isMobile && hasPermission(UserPermission.CREATE_TOPIC) && (
             <div className="bg-muted/30 p-4 rounded-lg mb-4">
               <p className="text-sm text-muted-foreground">
                 移动端仅支持浏览功能，如需发帖请使用桌面端访问。

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 
 const prisma = new PrismaClient();
 
@@ -34,6 +34,12 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
         permissions.push(...role.role.permissions);
       }
     });
+    
+    // 管理员自动拥有所有权限
+    if (permissions.includes(AdminPermission.ADMIN_ACCESS)) {
+      return true;
+    }
+    
     return permissions.includes(permission);
   }
   
@@ -53,6 +59,11 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
   
   // 检查用户的角色是否有指定权限
   for (const userRole of user.userRoles || []) {
+    // 管理员自动拥有所有权限
+    if (userRole.role.permissions.includes(AdminPermission.ADMIN_ACCESS)) {
+      return true;
+    }
+    
     if (userRole.role.permissions.includes(permission)) {
       return true;
     }
@@ -64,9 +75,9 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
 // 获取所有角色
 export async function GET(request: NextRequest) {
   try {
-    // 权限检查
+    // 权限检查 - 使用管理员权限
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasViewPermission = await checkPermission(session, Permission.VIEW_ROLES);
+    const hasViewPermission = await checkPermission(session, AdminPermission.ADMIN_ACCESS);
     
     if (!hasViewPermission) {
       return NextResponse.json(
@@ -75,6 +86,7 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    // 获取所有角色
     const roles = await prisma.role.findMany({
       orderBy: {
         name: 'asc'
@@ -113,9 +125,9 @@ export async function GET(request: NextRequest) {
 // 创建角色
 export async function POST(request: NextRequest) {
   try {
-    // 权限检查
+    // 权限检查 - 使用管理员权限
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasCreatePermission = await checkPermission(session, Permission.CREATE_ROLE);
+    const hasCreatePermission = await checkPermission(session, AdminPermission.ADMIN_ACCESS);
     
     if (!hasCreatePermission) {
       return NextResponse.json(

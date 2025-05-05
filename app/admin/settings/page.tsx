@@ -21,8 +21,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Permission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
+import { AdminPermission } from "@/lib/permissions";
+import { RestrictedRoute } from "@/components/restricted-route";
 
 interface SiteSettings {
   siteName: string;
@@ -107,7 +108,7 @@ export default function SettingsPage() {
   
   // 保存网站设置
   async function handleSaveSiteSettings() {
-    if (!hasPermission(Permission.EDIT_SETTINGS)) {
+    if (!hasPermission(AdminPermission.ADMIN_ACCESS)) {
       toast({
         title: "错误",
         description: "您没有权限修改系统设置",
@@ -151,10 +152,10 @@ export default function SettingsPage() {
   
   // 保存邮件设置
   async function handleSaveEmailSettings() {
-    if (!hasPermission(Permission.EDIT_SETTINGS)) {
+    if (!hasPermission(AdminPermission.ADMIN_ACCESS)) {
       toast({
         title: "错误",
-        description: "您没有权限修改系统设置",
+        description: "您没有权限修改邮件设置",
         variant: "destructive",
       });
       return;
@@ -234,256 +235,262 @@ export default function SettingsPage() {
   }
   
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">系统设置</h1>
-      </div>
-      
-      <Tabs defaultValue="site">
-        <TabsList className="mb-4">
-          <TabsTrigger value="site">网站设置</TabsTrigger>
-          <TabsTrigger value="email">邮件设置</TabsTrigger>
-        </TabsList>
+    <RestrictedRoute
+      permission={AdminPermission.ADMIN_ACCESS}
+      redirectTo="/admin"
+      loadingMessage="验证管理员权限中..."
+    >
+      <div className="container mx-auto py-6 space-y-8">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold tracking-tight">系统设置</h1>
+        </div>
         
-        <TabsContent value="site">
-          <Card>
-            <CardHeader>
-              <CardTitle>网站设置</CardTitle>
-              <CardDescription>
-                基本网站配置与功能设置
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="siteName">网站名称</Label>
-                    <Input
-                      id="siteName"
-                      value={siteSettings.siteName}
-                      onChange={e => updateSiteSettings('siteName', e.target.value)}
-                    />
+        <Tabs defaultValue="site">
+          <TabsList className="mb-4">
+            <TabsTrigger value="site">网站设置</TabsTrigger>
+            <TabsTrigger value="email">邮件设置</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="site">
+            <Card>
+              <CardHeader>
+                <CardTitle>网站设置</CardTitle>
+                <CardDescription>
+                  基本网站配置与功能设置
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="siteName">网站名称</Label>
+                      <Input
+                        id="siteName"
+                        value={siteSettings.siteName}
+                        onChange={e => updateSiteSettings('siteName', e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="siteDescription">网站描述</Label>
+                      <Input
+                        id="siteDescription"
+                        value={siteSettings.siteDescription}
+                        onChange={e => updateSiteSettings('siteDescription', e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="postsPerPage">每页显示帖子数</Label>
+                      <Input
+                        id="postsPerPage"
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={siteSettings.postsPerPage}
+                        onChange={e => updateSiteSettings('postsPerPage', parseInt(e.target.value))}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="contactEmail">联系邮箱</Label>
+                      <Input
+                        id="contactEmail"
+                        type="email"
+                        value={siteSettings.contactEmail}
+                        onChange={e => updateSiteSettings('contactEmail', e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="defaultUserRole">默认用户角色</Label>
+                      <Select 
+                        value={siteSettings.defaultUserRole}
+                        onValueChange={value => updateSiteSettings('defaultUserRole', value)}
+                      >
+                        <SelectTrigger id="defaultUserRole">
+                          <SelectValue placeholder="选择默认角色" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">普通用户</SelectItem>
+                          <SelectItem value="moderator">版主</SelectItem>
+                          <SelectItem value="contributor">贡献者</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="siteDescription">网站描述</Label>
-                    <Input
-                      id="siteDescription"
-                      value={siteSettings.siteDescription}
-                      onChange={e => updateSiteSettings('siteDescription', e.target.value)}
-                    />
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="registrationEnabled">允许注册</Label>
+                        <p className="text-sm text-muted-foreground">
+                          启用时允许新用户注册网站账号
+                        </p>
+                      </div>
+                      <Switch 
+                        id="registrationEnabled"
+                        checked={siteSettings.registrationEnabled}
+                        onCheckedChange={value => updateSiteSettings('registrationEnabled', value)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="commentsEnabled">允许评论</Label>
+                        <p className="text-sm text-muted-foreground">
+                          启用时用户可以在帖子下发表评论
+                        </p>
+                      </div>
+                      <Switch 
+                        id="commentsEnabled"
+                        checked={siteSettings.commentsEnabled}
+                        onCheckedChange={value => updateSiteSettings('commentsEnabled', value)}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="maintenanceMode" className="text-destructive">维护模式</Label>
+                        <p className="text-sm text-muted-foreground">
+                          启用时网站将对普通用户显示维护页面
+                        </p>
+                      </div>
+                      <Switch 
+                        id="maintenanceMode"
+                        checked={siteSettings.maintenanceMode}
+                        onCheckedChange={value => updateSiteSettings('maintenanceMode', value)}
+                      />
+                    </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="postsPerPage">每页显示帖子数</Label>
-                    <Input
-                      id="postsPerPage"
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={siteSettings.postsPerPage}
-                      onChange={e => updateSiteSettings('postsPerPage', parseInt(e.target.value))}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="contactEmail">联系邮箱</Label>
-                    <Input
-                      id="contactEmail"
-                      type="email"
-                      value={siteSettings.contactEmail}
-                      onChange={e => updateSiteSettings('contactEmail', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="defaultUserRole">默认用户角色</Label>
-                    <Select 
-                      value={siteSettings.defaultUserRole}
-                      onValueChange={value => updateSiteSettings('defaultUserRole', value)}
+                  <div className="flex justify-end">
+                    <Button 
+                      onClick={handleSaveSiteSettings}
+                      disabled={isSaving}
                     >
-                      <SelectTrigger id="defaultUserRole">
-                        <SelectValue placeholder="选择默认角色" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user">普通用户</SelectItem>
-                        <SelectItem value="moderator">版主</SelectItem>
-                        <SelectItem value="contributor">贡献者</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {isSaving ? "保存中..." : "保存设置"}
+                    </Button>
                   </div>
                 </div>
-                
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="registrationEnabled">允许注册</Label>
-                      <p className="text-sm text-muted-foreground">
-                        启用时允许新用户注册网站账号
-                      </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="email">
+            <Card>
+              <CardHeader>
+                <CardTitle>邮件设置</CardTitle>
+                <CardDescription>
+                  邮件服务器配置
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpHost">SMTP服务器</Label>
+                      <Input
+                        id="smtpHost"
+                        value={emailSettings.smtpHost}
+                        onChange={e => updateEmailSettings('smtpHost', e.target.value)}
+                        placeholder="例如: smtp.example.com"
+                      />
                     </div>
-                    <Switch 
-                      id="registrationEnabled"
-                      checked={siteSettings.registrationEnabled}
-                      onCheckedChange={value => updateSiteSettings('registrationEnabled', value)}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="commentsEnabled">允许评论</Label>
-                      <p className="text-sm text-muted-foreground">
-                        启用时用户可以在帖子下发表评论
-                      </p>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPort">SMTP端口</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={emailSettings.smtpPort}
+                        onChange={e => updateEmailSettings('smtpPort', parseInt(e.target.value))}
+                        placeholder="例如: 587"
+                      />
                     </div>
-                    <Switch 
-                      id="commentsEnabled"
-                      checked={siteSettings.commentsEnabled}
-                      onCheckedChange={value => updateSiteSettings('commentsEnabled', value)}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="maintenanceMode" className="text-destructive">维护模式</Label>
-                      <p className="text-sm text-muted-foreground">
-                        启用时网站将对普通用户显示维护页面
-                      </p>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpUser">SMTP用户名</Label>
+                      <Input
+                        id="smtpUser"
+                        value={emailSettings.smtpUser}
+                        onChange={e => updateEmailSettings('smtpUser', e.target.value)}
+                        placeholder="例如: user@example.com"
+                      />
                     </div>
-                    <Switch 
-                      id="maintenanceMode"
-                      checked={siteSettings.maintenanceMode}
-                      onCheckedChange={value => updateSiteSettings('maintenanceMode', value)}
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex justify-end">
-                  <Button 
-                    onClick={handleSaveSiteSettings}
-                    disabled={isSaving || !hasPermission(Permission.EDIT_SETTINGS)}
-                  >
-                    {isSaving ? "保存中..." : "保存设置"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="email">
-          <Card>
-            <CardHeader>
-              <CardTitle>邮件设置</CardTitle>
-              <CardDescription>
-                邮件服务器配置
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpHost">SMTP服务器</Label>
-                    <Input
-                      id="smtpHost"
-                      value={emailSettings.smtpHost}
-                      onChange={e => updateEmailSettings('smtpHost', e.target.value)}
-                      placeholder="例如: smtp.example.com"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpPort">SMTP端口</Label>
-                    <Input
-                      id="smtpPort"
-                      type="number"
-                      min="1"
-                      max="65535"
-                      value={emailSettings.smtpPort}
-                      onChange={e => updateEmailSettings('smtpPort', parseInt(e.target.value))}
-                      placeholder="例如: 587"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpUser">SMTP用户名</Label>
-                    <Input
-                      id="smtpUser"
-                      value={emailSettings.smtpUser}
-                      onChange={e => updateEmailSettings('smtpUser', e.target.value)}
-                      placeholder="例如: user@example.com"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="smtpPassword">SMTP密码</Label>
-                    <Input
-                      id="smtpPassword"
-                      type="password"
-                      value={emailSettings.smtpPassword}
-                      onChange={e => updateEmailSettings('smtpPassword', e.target.value)}
-                      placeholder="请输入SMTP密码"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="emailFromName">发件人名称</Label>
-                    <Input
-                      id="emailFromName"
-                      value={emailSettings.emailFromName}
-                      onChange={e => updateEmailSettings('emailFromName', e.target.value)}
-                      placeholder="例如: PonyKnows管理员"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="emailFromAddress">发件人邮箱</Label>
-                    <Input
-                      id="emailFromAddress"
-                      type="email"
-                      value={emailSettings.emailFromAddress}
-                      onChange={e => updateEmailSettings('emailFromAddress', e.target.value)}
-                      placeholder="例如: admin@example.com"
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="smtpSecure">使用SSL/TLS</Label>
-                      <p className="text-sm text-muted-foreground">
-                        启用时使用安全连接
-                      </p>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPassword">SMTP密码</Label>
+                      <Input
+                        id="smtpPassword"
+                        type="password"
+                        value={emailSettings.smtpPassword}
+                        onChange={e => updateEmailSettings('smtpPassword', e.target.value)}
+                        placeholder="请输入SMTP密码"
+                      />
                     </div>
-                    <Switch 
-                      id="smtpSecure"
-                      checked={emailSettings.smtpSecure}
-                      onCheckedChange={value => updateEmailSettings('smtpSecure', value)}
-                    />
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="emailFromName">发件人名称</Label>
+                      <Input
+                        id="emailFromName"
+                        value={emailSettings.emailFromName}
+                        onChange={e => updateEmailSettings('emailFromName', e.target.value)}
+                        placeholder="例如: PonyKnows管理员"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="emailFromAddress">发件人邮箱</Label>
+                      <Input
+                        id="emailFromAddress"
+                        type="email"
+                        value={emailSettings.emailFromAddress}
+                        onChange={e => updateEmailSettings('emailFromAddress', e.target.value)}
+                        placeholder="例如: admin@example.com"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="smtpSecure">使用SSL/TLS</Label>
+                        <p className="text-sm text-muted-foreground">
+                          启用时使用安全连接
+                        </p>
+                      </div>
+                      <Switch 
+                        id="smtpSecure"
+                        checked={emailSettings.smtpSecure}
+                        onCheckedChange={value => updateEmailSettings('smtpSecure', value)}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleTestEmailSettings}
+                      disabled={isSaving}
+                    >
+                      测试设置
+                    </Button>
+                    <Button 
+                      onClick={handleSaveEmailSettings}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "保存中..." : "保存设置"}
+                    </Button>
                   </div>
                 </div>
-                
-                <div className="flex justify-end space-x-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleTestEmailSettings}
-                    disabled={isSaving}
-                  >
-                    测试设置
-                  </Button>
-                  <Button 
-                    onClick={handleSaveEmailSettings}
-                    disabled={isSaving || !hasPermission(Permission.EDIT_SETTINGS)}
-                  >
-                    {isSaving ? "保存中..." : "保存设置"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </RestrictedRoute>
   );
 } 

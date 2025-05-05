@@ -44,7 +44,7 @@ import {
   CheckCircle2,
   XCircle
 } from "lucide-react";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission, UserPermission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -348,7 +348,7 @@ export default function PostsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">帖子管理</h1>
         
-        {selectedPosts.length > 0 && hasPermission(Permission.DELETE_POST) && (
+        {selectedPosts.length > 0 && hasPermission(AdminPermission.ADMIN_ACCESS) && (
           <Button 
             variant="destructive" 
             onClick={() => setIsDeleteDialogOpen(true)}
@@ -536,7 +536,7 @@ export default function PostsPage() {
                                   <span className="sr-only">查看</span>
                                 </a>
                               </Button>
-                              {hasPermission(Permission.EDIT_POST) && (
+                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -550,7 +550,7 @@ export default function PostsPage() {
                                   </a>
                                 </Button>
                               )}
-                              {hasPermission(Permission.DELETE_POST) && (
+                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -26,14 +26,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Search, 
-  Eye, 
-  Trash
-} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Permission } from "@/lib/permissions";
+import { Search, Trash, Eye } from "lucide-react";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
+import { AdminPermission } from "@/lib/permissions";
+import { RestrictedRoute } from "@/components/restricted-route";
 
 interface Comment {
   id: string;
@@ -143,152 +140,158 @@ export default function CommentsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">评论管理</h1>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>评论列表</CardTitle>
-          <CardDescription>
-            管理帖子评论
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索评论内容..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+    <RestrictedRoute 
+      permission={AdminPermission.ADMIN_ACCESS}
+      redirectTo="/admin"
+      loadingMessage="验证管理员权限中..."
+    >
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold tracking-tight">评论管理</h1>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>评论列表</CardTitle>
+            <CardDescription>
+              管理帖子评论
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索评论内容..."
+                  className="pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-          
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-              <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
-            </div>
-          ) : (
-            <>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>内容</TableHead>
-                      <TableHead>所属帖子</TableHead>
-                      <TableHead>评论者</TableHead>
-                      <TableHead>评论时间</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {comments.length === 0 ? (
+            
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center h-24">
-                          没有找到评论
-                        </TableCell>
+                        <TableHead>内容</TableHead>
+                        <TableHead>所属帖子</TableHead>
+                        <TableHead>评论者</TableHead>
+                        <TableHead>评论时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
                       </TableRow>
-                    ) : (
-                      comments.map((comment) => (
-                        <TableRow key={comment.id}>
-                          <TableCell className="max-w-xs">
-                            {truncateContent(comment.content)}
+                    </TableHeader>
+                    <TableBody>
+                      {comments.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center h-24">
+                            没有找到评论
                           </TableCell>
-                          <TableCell>
-                            <a 
-                              href={`/forum/post/${comment.post.id}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="hover:underline text-primary"
-                            >
-                              {truncateContent(comment.post.title, 30)}
-                            </a>
-                          </TableCell>
-                          <TableCell>{comment.author.name}</TableCell>
-                          <TableCell>{formatDate(comment.createdAt)}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                asChild
+                        </TableRow>
+                      ) : (
+                        comments.map((comment) => (
+                          <TableRow key={comment.id}>
+                            <TableCell className="max-w-xs">
+                              {truncateContent(comment.content)}
+                            </TableCell>
+                            <TableCell>
+                              <a 
+                                href={`/forum/post/${comment.post.id}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="hover:underline text-primary"
                               >
-                                <a href={`/forum/post/${comment.post.id}`} target="_blank" rel="noopener noreferrer">
-                                  <Eye className="h-4 w-4" />
-                                  <span className="sr-only">查看</span>
-                                </a>
-                              </Button>
-                              {hasPermission(Permission.DELETE_COMMENT) && (
+                                {truncateContent(comment.post.title, 30)}
+                              </a>
+                            </TableCell>
+                            <TableCell>{comment.author.name}</TableCell>
+                            <TableCell>{formatDate(comment.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleOpenDeleteDialog(comment.id)}
+                                  asChild
                                 >
-                                  <Trash className="h-4 w-4" />
-                                  <span className="sr-only">删除</span>
+                                  <a href={`/forum/post/${comment.post.id}`} target="_blank" rel="noopener noreferrer">
+                                    <Eye className="h-4 w-4" />
+                                    <span className="sr-only">查看</span>
+                                  </a>
                                 </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-muted-foreground">
-                  显示 {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} 条，共 {total} 条
-                </p>
-                <div className="flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(page - 1)}
-                    disabled={page === 1}
-                  >
-                    上一页
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPage(page + 1)}
-                    disabled={page * limit >= total}
-                  >
-                    下一页
-                  </Button>
+                                {hasPermission(AdminPermission.ADMIN_ACCESS) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleOpenDeleteDialog(comment.id)}
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                    <span className="sr-only">删除</span>
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* 删除确认对话框 */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
-            <DialogDescription>
-              您确定要删除这条评论吗？此操作不可恢复。
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-              取消
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteComment}>
-              确认删除
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+                
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    显示 {Math.min((page - 1) * limit + 1, total)} - {Math.min(page * limit, total)} 条，共 {total} 条
+                  </p>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page - 1)}
+                      disabled={page === 1}
+                    >
+                      上一页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page + 1)}
+                      disabled={page * limit >= total}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* 删除确认对话框 */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>确认删除</DialogTitle>
+              <DialogDescription>
+                您确定要删除这条评论吗？此操作不可恢复。
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                取消
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteComment}>
+                确认删除
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </RestrictedRoute>
   );
 } 

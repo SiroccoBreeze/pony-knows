@@ -19,24 +19,11 @@ export function PermissionsLoadingProvider({ children }: PermissionsLoadingProvi
   const [isReady, setIsReady] = useState(false);
   const { startLoading, stopLoading } = useLoadingStore();
   
-  // 自定义权限加载图标
-  const permissionLoadingIcon = (
-    <div className="relative">
-      <div 
-        className="h-36 w-36 animate-spin rounded-full border-4 border-primary/30 border-t-primary"
-      ></div>
-      <Shield 
-        className="text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" 
-        size={18}
-      />
-    </div>
-  );
-  
   // 监听权限加载状态
   useEffect(() => {
     if (isPermissionsLoading) {
       // 权限加载中，显示全局加载状态
-      startLoading("权限验证中", "正在加载用户权限，请稍候...");
+      startLoading("应用初始化中", "正在加载用户权限...");
       setIsReady(false);
     } else {
       // 权限加载完成
@@ -55,10 +42,14 @@ export function PermissionsLoadingProvider({ children }: PermissionsLoadingProvi
     return (
       <LoadingScreen 
         message="应用初始化中" 
-        subMessage="正在加载用户权限，请稍候..."
+        subMessage="正在加载用户权限..."
         fullScreen={true}
         iconSize={36}
-        icon={permissionLoadingIcon}
+        icon={
+          <div className="relative">
+            <div className="h-36 w-36 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+          </div>
+        }
       />
     );
   }

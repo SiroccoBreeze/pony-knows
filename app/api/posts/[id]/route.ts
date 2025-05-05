@@ -146,7 +146,7 @@ export async function PATCH(
     
     // 检查权限：用户必须拥有编辑帖子权限或是超级管理员
     const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
-    const canEditPosts = userPermissions.includes(AdminPermission.EDIT_POST);
+    const canEditPosts = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
 
     // 只允许管理员或超级管理员进行审核操作
     if (!canEditPosts && !isAdmin && !isSuperAdmin && !adminOverride) {
@@ -297,7 +297,7 @@ export async function PUT(
     // 检查权限：用户必须是帖子作者或拥有编辑帖子权限或是超级管理员
     const isAuthor = existingPost.authorId === session.user.id;
     const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
-    const canEditPosts = userPermissions.includes(AdminPermission.EDIT_POST);
+    const canEditPosts = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
 
     console.log("API - 权限检查:", {
       isAuthor,
@@ -307,7 +307,7 @@ export async function PUT(
       adminOverride,
       userId: session.user.id,
       authorId: existingPost.authorId,
-      editPostPermission: AdminPermission.EDIT_POST
+      editPostPermission: AdminPermission.ADMIN_ACCESS
     });
 
     // 放宽权限检查，允许超级管理员编辑任何帖子
@@ -508,20 +508,18 @@ export async function DELETE(
     const adminOverride = request.headers.get("X-Admin-Override") === "true";
     console.log("API - 请求头中的管理员覆盖标记:", adminOverride);
     
-    // 检查权限：用户必须是帖子作者或拥有删除帖子权限或是超级管理员
+    // 检查权限：用户必须是帖子作者或有删除权限
     const isAuthor = existingPost.authorId === session.user.id;
     const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
-    const canDeletePosts = userPermissions.includes(AdminPermission.DELETE_POST);
+    const canDeletePosts = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
 
-    console.log("API - 权限检查:", {
+    console.log("API - 删除权限检查:", {
       isAuthor,
       isAdmin,
       canDeletePosts,
-      isSuperAdmin,
-      adminOverride,
       userId: session.user.id,
       authorId: existingPost.authorId,
-      deletePostPermission: AdminPermission.DELETE_POST
+      deletePostPermission: AdminPermission.ADMIN_ACCESS
     });
 
     // 放宽权限检查，允许超级管理员删除任何帖子

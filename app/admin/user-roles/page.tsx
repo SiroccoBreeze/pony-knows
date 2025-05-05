@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Plus, ShieldCheck, Shield, Trash2, Pencil, Users, Search } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { UserPermission, AdminPermission } from "@/lib/permissions";
+import { AdminPermission, UserPermission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import {
   DropdownMenu,
@@ -50,20 +50,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { RestrictedRoute } from "@/components/restricted-route";
 
 // 权限分组配置
 const PERMISSION_GROUPS = [
+  {
+    id: "admin",
+    name: "管理员权限",
+    permissions: [
+      AdminPermission.ADMIN_ACCESS,
+    ],
+  },
   {
     id: "forum",
     name: "论坛权限",
     permissions: [
       UserPermission.VIEW_FORUM,
       UserPermission.CREATE_TOPIC,
-      UserPermission.REPLY_TOPIC,
-      UserPermission.UPLOAD_IMAGES,
-      UserPermission.EDIT_OWN_POSTS,
-      UserPermission.DELETE_OWN_POSTS,
-      UserPermission.REPORT_CONTENT,
     ],
   },
   {
@@ -72,27 +75,22 @@ const PERMISSION_GROUPS = [
     permissions: [
       UserPermission.VIEW_SERVICES,
       UserPermission.ACCESS_FILE_DOWNLOADS,
-      UserPermission.DOWNLOAD_RESOURCES,
-      UserPermission.VIEW_QUARK_LINKS,
-      UserPermission.VIEW_BAIDU_LINKS,
+      UserPermission.ACCESS_DATABASE,
+      UserPermission.ACCESS_MINIO,
     ],
   },
   {
-    id: "minio",
-    name: "网盘与数据库权限",
+    id: "working_papers",
+    name: "实施底稿权限",
     permissions: [
-      UserPermission.ACCESS_DATABASE,
-      UserPermission.ACCESS_MINIO,
-      UserPermission.UPLOAD_TO_MINIO,
+      UserPermission.ACCESS_WORKING_PAPERS,
     ],
   },
   {
     id: "personal",
     name: "个人中心权限",
     permissions: [
-      UserPermission.EDIT_PROFILE,
-      UserPermission.CHANGE_PASSWORD,
-      UserPermission.VIEW_NOTIFICATIONS,
+      UserPermission.VIEW_PROFILE,
     ],
   },
 ];
@@ -103,28 +101,21 @@ function getPermissionName(permission: string): string {
     // 论坛权限
     case UserPermission.VIEW_FORUM: return "查看论坛内容";
     case UserPermission.CREATE_TOPIC: return "创建主题帖";
-    case UserPermission.REPLY_TOPIC: return "回复主题帖";
-    case UserPermission.UPLOAD_IMAGES: return "上传图片";
-    case UserPermission.EDIT_OWN_POSTS: return "编辑自己的帖子";
-    case UserPermission.DELETE_OWN_POSTS: return "删除自己的帖子";
-    case UserPermission.REPORT_CONTENT: return "举报内容";
     
     // 服务与资源权限
     case UserPermission.VIEW_SERVICES: return "查看服务页面";
     case UserPermission.ACCESS_FILE_DOWNLOADS: return "访问文件下载页面";
-    case UserPermission.DOWNLOAD_RESOURCES: return "下载资源文件";
-    case UserPermission.VIEW_QUARK_LINKS: return "查看夸克网盘链接";
-    case UserPermission.VIEW_BAIDU_LINKS: return "查看百度网盘链接";
-    
-    // 网盘与数据库权限
     case UserPermission.ACCESS_DATABASE: return "访问数据库结构";
     case UserPermission.ACCESS_MINIO: return "访问网盘服务";
-    case UserPermission.UPLOAD_TO_MINIO: return "上传文件到网盘";
+    
+    // 实施底稿权限
+    case UserPermission.ACCESS_WORKING_PAPERS: return "访问实施底稿";
     
     // 个人中心权限
-    case UserPermission.EDIT_PROFILE: return "编辑个人资料";
-    case UserPermission.CHANGE_PASSWORD: return "修改密码";
-    case UserPermission.VIEW_NOTIFICATIONS: return "查看个人通知";
+    case UserPermission.VIEW_PROFILE: return "查看个人资料";
+    
+    // 管理员权限
+    case AdminPermission.ADMIN_ACCESS: return "管理员访问权限";
     
     default: return permission;
   }
@@ -391,120 +382,110 @@ export default function UserRolesPage() {
       )
     : roles;
 
-  // 检查是否有权限访问此页面
-  if (!hasPermission(AdminPermission.VIEW_ROLES)) {
-    return (
-      <div className="p-8 text-center">
-        <h2 className="text-xl font-semibold">没有访问权限</h2>
-        <p className="mt-2 text-muted-foreground">您没有查看此页面的权限</p>
-      </div>
-    );
-  }
-  
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">用户角色管理</h1>
-        
-        {hasPermission(AdminPermission.CREATE_ROLE) && (
+    <RestrictedRoute 
+      permission={AdminPermission.ADMIN_ACCESS}
+      redirectTo="/admin"
+      loadingMessage="验证管理员权限中..."
+    >
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold tracking-tight">用户角色管理</h1>
+          
           <Button onClick={handleCreateRole}>
             <Plus className="mr-2 h-4 w-4" />
             添加角色
           </Button>
-        )}
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>用户角色列表</CardTitle>
-          <CardDescription>
-            管理系统用户角色和权限，控制前台功能的访问权限
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索角色..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>用户角色列表</CardTitle>
+            <CardDescription>
+              管理系统用户角色和权限，控制前台功能的访问权限
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="relative max-w-md">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="搜索角色..."
+                  className="pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-          
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-              <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
-            </div>
-          ) : filteredRoles.length === 0 ? (
-            <div className="text-center py-8">
-              <ShieldCheck className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-40" />
-              <h3 className="text-lg font-medium">暂无角色数据</h3>
-              <p className="mt-2 text-muted-foreground">
-                {searchQuery ? "没有找到匹配的角色" : "系统中还没有创建任何用户角色"}
-              </p>
-              {hasPermission(AdminPermission.CREATE_ROLE) && !searchQuery && (
-                <Button className="mt-4" onClick={handleCreateRole}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  添加第一个角色
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>角色名称</TableHead>
-                    <TableHead>描述</TableHead>
-                    <TableHead>权限数</TableHead>
-                    <TableHead>用户数</TableHead>
-                    <TableHead>创建时间</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRoles.map((role) => (
-                    <TableRow key={role.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center">
-                          <Shield className="h-4 w-4 mr-2 text-primary" />
-                          {role.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{role.description || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {role.permissions.length} 项权限
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-1 text-muted-foreground" />
-                          <span>{role.userCount}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(role.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {hasPermission(AdminPermission.EDIT_ROLE) && (
+            
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+                <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
+              </div>
+            ) : filteredRoles.length === 0 ? (
+              <div className="text-center py-8">
+                <ShieldCheck className="h-12 w-12 text-muted-foreground mx-auto mb-2 opacity-40" />
+                <h3 className="text-lg font-medium">暂无角色数据</h3>
+                <p className="mt-2 text-muted-foreground">
+                  {searchQuery ? "没有找到匹配的角色" : "系统中还没有创建任何用户角色"}
+                </p>
+                {hasPermission(AdminPermission.ADMIN_ACCESS) && !searchQuery && (
+                  <Button className="mt-4" onClick={handleCreateRole}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    添加第一个角色
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>角色名称</TableHead>
+                      <TableHead>描述</TableHead>
+                      <TableHead>权限数</TableHead>
+                      <TableHead>用户数</TableHead>
+                      <TableHead>创建时间</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRoles.map((role) => (
+                      <TableRow key={role.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center">
+                            <Shield className="h-4 w-4 mr-2 text-primary" />
+                            {role.name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{role.description || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {role.permissions.length} 项权限
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-1 text-muted-foreground" />
+                            <span>{role.userCount}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(role.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleEditRole(role.id)}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 编辑角色
                               </DropdownMenuItem>
-                            )}
-                            {hasPermission(AdminPermission.DELETE_ROLE) && (
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onClick={() => handleDeleteConfirm(role.id)}
@@ -512,179 +493,179 @@ export default function UserRolesPage() {
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 删除角色
                               </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* 角色编辑对话框 */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {isEditMode ? "编辑用户角色" : "创建用户角色"}
-            </DialogTitle>
-            <DialogDescription>
-              {isEditMode
-                ? "修改用户角色信息和权限配置"
-                : "创建新的用户角色并配置权限"}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleFormSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name" className="required">
-                  角色名称
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="description">
-                  角色描述
-                </Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="请输入角色描述（可选）"
-                  rows={2}
-                />
-              </div>
-              
-              <div className="grid gap-2 pt-4">
-                <Label className="required">权限配置</Label>
-                <div className="border rounded-md p-4 space-y-6">
-                  {PERMISSION_GROUPS.map((group) => {
-                    // 判断分组是否全选
-                    const isGroupChecked =
-                      group.permissions.length > 0 &&
-                      group.permissions.every((perm) =>
-                        formData.permissions.includes(perm)
-                      );
-                    
-                    // 判断分组是否部分选中
-                    const isGroupIndeterminate =
-                      !isGroupChecked &&
-                      group.permissions.some((perm) =>
-                        formData.permissions.includes(perm)
-                      );
-                    
-                    return (
-                      <div key={group.id} className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`group-${group.id}`}
-                            checked={isGroupChecked}
-                            data-indeterminate={isGroupIndeterminate}
-                            className={
-                              isGroupIndeterminate
-                                ? "bg-primary/50 text-primary-foreground"
-                                : ""
-                            }
-                            onCheckedChange={(checked) =>
-                              handleGroupPermissionChange(
-                                group.permissions,
-                                checked as boolean
-                              )
-                            }
-                          />
-                          <Label
-                            htmlFor={`group-${group.id}`}
-                            className="text-base font-medium"
-                          >
-                            {group.name}
-                          </Label>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-6 pt-2">
-                          {group.permissions.map((permission) => (
-                            <div
-                              key={permission}
-                              className="flex items-center space-x-2"
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* 角色编辑对话框 */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {isEditMode ? "编辑用户角色" : "创建用户角色"}
+              </DialogTitle>
+              <DialogDescription>
+                {isEditMode
+                  ? "修改用户角色信息和权限配置"
+                  : "创建新的用户角色并配置权限"}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <form onSubmit={handleFormSubmit}>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name" className="required">
+                    角色名称
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="description">
+                    角色描述
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="请输入角色描述（可选）"
+                    rows={2}
+                  />
+                </div>
+                
+                <div className="grid gap-2 pt-4">
+                  <Label className="required">权限配置</Label>
+                  <div className="border rounded-md p-4 space-y-6">
+                    {PERMISSION_GROUPS.map((group) => {
+                      // 判断分组是否全选
+                      const isGroupChecked =
+                        group.permissions.length > 0 &&
+                        group.permissions.every((perm) =>
+                          formData.permissions.includes(perm)
+                        );
+                      
+                      // 判断分组是否部分选中
+                      const isGroupIndeterminate =
+                        !isGroupChecked &&
+                        group.permissions.some((perm) =>
+                          formData.permissions.includes(perm)
+                        );
+                      
+                      return (
+                        <div key={group.id} className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`group-${group.id}`}
+                              checked={isGroupChecked}
+                              data-indeterminate={isGroupIndeterminate}
+                              className={
+                                isGroupIndeterminate
+                                  ? "bg-primary/50 text-primary-foreground"
+                                  : ""
+                              }
+                              onCheckedChange={(checked) =>
+                                handleGroupPermissionChange(
+                                  group.permissions,
+                                  checked as boolean
+                                )
+                              }
+                            />
+                            <Label
+                              htmlFor={`group-${group.id}`}
+                              className="text-base font-medium"
                             >
-                              <Checkbox
-                                id={permission}
-                                checked={formData.permissions.includes(
-                                  permission
-                                )}
-                                onCheckedChange={(checked) =>
-                                  handlePermissionChange(
-                                    permission,
-                                    checked as boolean
-                                  )
-                                }
-                              />
-                              <Label
-                                htmlFor={permission}
-                                className="text-sm font-normal"
+                              {group.name}
+                            </Label>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-6 pt-2">
+                            {group.permissions.map((permission) => (
+                              <div
+                                key={permission}
+                                className="flex items-center space-x-2"
                               >
-                                {getPermissionName(permission)}
-                              </Label>
-                            </div>
-                          ))}
+                                <Checkbox
+                                  id={permission}
+                                  checked={formData.permissions.includes(
+                                    permission
+                                  )}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      permission,
+                                      checked as boolean
+                                    )
+                                  }
+                                />
+                                <Label
+                                  htmlFor={permission}
+                                  className="text-sm font-normal"
+                                >
+                                  {getPermissionName(permission)}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button type="submit">
+                  {isEditMode ? "保存修改" : "创建角色"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+        
+        {/* 删除确认对话框 */}
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除角色</AlertDialogTitle>
+              <AlertDialogDescription>
+                此操作将永久删除该用户角色，且无法恢复。若有用户正在使用此角色，则无法删除。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteRole}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                取消
-              </Button>
-              <Button type="submit">
-                {isEditMode ? "保存修改" : "创建角色"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-      
-      {/* 删除确认对话框 */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除角色</AlertDialogTitle>
-            <AlertDialogDescription>
-              此操作将永久删除该用户角色，且无法恢复。若有用户正在使用此角色，则无法删除。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteRole}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              确认删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+                确认删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </RestrictedRoute>
   );
 } 

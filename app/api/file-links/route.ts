@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
+import { AdminPermission } from '@/lib/permissions';
 
 // 定义外部链接类型
 export type ExternalLink = {
@@ -19,11 +20,42 @@ export type ExternalLink = {
 export async function GET() {
   try {
     const session = await getServerSession();
-    // 简化的权限检查 - 任何登录用户都被视为普通用户
-    const isAdmin = !!session?.user;
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: '需要登录才能访问' },
+        { status: 401 }
+      );
+    }
+    
+    // 简化的权限检查 - 查询用户角色和权限
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email as string },
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: '用户不存在' },
+        { status: 404 }
+      );
+    }
+    
+    // 收集用户的所有权限
+    const permissions: string[] = [];
+    for (const userRole of user.userRoles) {
+      permissions.push(...(userRole.role.permissions || []));
+    }
+    
+    const isAdmin = permissions.includes(AdminPermission.ADMIN_ACCESS);
     
     // 如果是管理员，返回所有链接；否则只返回激活的链接
-    const links = await prisma.externalLink.findMany({
+    const links = await prisma.link.findMany({
       where: isAdmin ? {} : { isActive: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -42,9 +74,42 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession();
-    
-    // 简化的权限检查 - 任何登录用户都被视为管理员
     if (!session?.user) {
+      return NextResponse.json(
+        { error: '需要登录才能访问' },
+        { status: 401 }
+      );
+    }
+    
+    // 简化的权限检查 - 查询用户角色和权限
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email as string },
+      include: {
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: '用户不存在' },
+        { status: 404 }
+      );
+    }
+    
+    // 收集用户的所有权限
+    const permissions: string[] = [];
+    for (const userRole of user.userRoles) {
+      permissions.push(...(userRole.role.permissions || []));
+    }
+    
+    const isAdmin = permissions.includes(AdminPermission.ADMIN_ACCESS);
+    
+    // 验证管理员权限
+    if (!isAdmin) {
       return NextResponse.json(
         { error: '无权限执行此操作' },
         { status: 403 }
@@ -61,7 +126,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const newLink = await prisma.externalLink.create({
+    const newLink = await prisma.link.create({
       data: {
         title: data.title,
         url: data.url,

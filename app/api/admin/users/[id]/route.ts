@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 
 const prisma = new PrismaClient();
 
@@ -48,10 +48,10 @@ export async function PUT(
       });
     }
 
-    const isSuperAdmin = session.user.roles?.some(role => role.role.name === "超级管理员");
-    const canEditUsers = userPermissions.includes(Permission.EDIT_USER);
+    // 管理员自动拥有所有权限
+    const hasAdminAccess = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
     
-    if (!canEditUsers && !isSuperAdmin) {
+    if (!hasAdminAccess) {
       return NextResponse.json(
         { error: "没有权限编辑用户" },
         { status: 403 }
@@ -178,15 +178,15 @@ export async function GET(
       });
     }
 
-    const isSuperAdmin = session.user.roles?.some(role => role.role.name === "超级管理员");
-    const canViewUsers = userPermissions.includes(Permission.VIEW_USERS);
+    // 管理员自动拥有所有权限
+    const hasAdminAccess = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
     
     // 确保params已解析
     const paramsData = await params;
     
     // 只允许查看自己或有权限的用户可以查看其他用户
     const isOwnProfile = paramsData.id === session.user.id;
-    if (!isOwnProfile && !canViewUsers && !isSuperAdmin) {
+    if (!isOwnProfile && !hasAdminAccess) {
       return NextResponse.json(
         { error: "没有权限查看此用户" },
         { status: 403 }
@@ -201,10 +201,17 @@ export async function GET(
       include: {
         userRoles: {
           include: {
-            role: true,
-          },
-        },
-      },
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+                permissions: true
+              }
+            }
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -214,12 +221,118 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(user);
+    // 返回格式化的用户数据
+    return NextResponse.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+      isActive: user.isActive,
+      status: user.status,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      roles: user.userRoles.map(ur => ({
+        id: ur.role.id,
+        name: ur.role.name,
+        description: ur.role.description,
+        permissions: ur.role.permissions
+      }))
+    });
   } catch (error) {
-    console.error("获取用户失败:", error);
-    const errorMessage = error instanceof Error ? error.message : "未知错误";
+    console.error("获取用户详情失败:", error);
     return NextResponse.json(
-      { error: "获取用户失败", details: errorMessage },
+      { error: "获取用户详情失败，请稍后再试" },
+      { status: 500 }
+    );
+  }
+}
+
+// 删除用户
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // 权限检查
+    const session = await getServerSession(authOptions) as ExtendedSession;
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "未授权访问" },
+        { status: 401 }
+      );
+    }
+
+    // 检查用户是否有删除用户的权限
+    const userPermissions: string[] = [];
+    if (session.user.roles) {
+      session.user.roles.forEach(role => {
+        if (role.role.permissions) {
+          userPermissions.push(...role.role.permissions);
+        }
+      });
+    }
+
+    // 管理员自动拥有所有权限
+    const hasAdminAccess = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
+    
+    if (!hasAdminAccess) {
+      return NextResponse.json(
+        { error: "没有权限删除用户" },
+        { status: 403 }
+      );
+    }
+
+    // 确保params已解析
+    const paramsData = await params;
+    const userId = paramsData.id;
+
+    // 防止删除自己
+    if (userId === session.user.id) {
+      return NextResponse.json(
+        { error: "不能删除当前登录的用户" },
+        { status: 400 }
+      );
+    }
+
+    // 检查用户是否存在
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!userExists) {
+      return NextResponse.json(
+        { error: "用户不存在" },
+        { status: 404 }
+      );
+    }
+
+    // 删除用户关联的角色
+    await prisma.userRole.deleteMany({
+      where: { userId },
+    });
+
+    // 删除用户
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    // 记录管理员操作日志
+    await prisma.adminLog.create({
+      data: {
+        userId: session.user.id,
+        action: "DELETE_USER",
+        resource: "USER",
+        resourceId: userId,
+        details: { deletedUser: { id: userId, email: userExists.email } },
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("删除用户失败:", error);
+    return NextResponse.json(
+      { error: "删除用户失败，请稍后再试" },
       { status: 500 }
     );
   }

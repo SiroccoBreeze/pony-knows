@@ -24,20 +24,12 @@ export async function GET(req: NextRequest) {
     const userPermissions = userRoles.flatMap(ur => ur.role.permissions);
 
     // 验证是否有查看角色的权限
-    if (!hasPermission(userPermissions, AdminPermission.VIEW_ROLES)) {
+    if (!hasPermission(userPermissions, AdminPermission.ADMIN_ACCESS)) {
       return NextResponse.json({ error: '没有查看角色的权限' }, { status: 403 });
     }
 
-    // 查询不包含管理员权限的角色（即用户角色）
+    // 修改查询条件，获取所有角色（包括管理员角色）
     const roles = await prisma.role.findMany({
-      where: {
-        // 筛选权限不包含ADMIN_ACCESS的角色作为用户角色
-        NOT: {
-          permissions: {
-            has: AdminPermission.ADMIN_ACCESS
-          }
-        }
-      },
       orderBy: { name: 'asc' }
     });
 
@@ -86,7 +78,7 @@ export async function POST(req: NextRequest) {
     const userPermissions = userRoles.flatMap(ur => ur.role.permissions);
 
     // 验证是否有创建角色的权限
-    if (!hasPermission(userPermissions, AdminPermission.CREATE_ROLE)) {
+    if (!hasPermission(userPermissions, AdminPermission.ADMIN_ACCESS)) {
       return NextResponse.json({ error: '没有创建角色的权限' }, { status: 403 });
     }
 
@@ -108,11 +100,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 确保用户角色不包含管理员权限
-    const userPermissionsOnly = permissions.filter(
-      permission => permission !== AdminPermission.ADMIN_ACCESS
-    );
-
     // 检查角色名称是否已存在
     const existingRole = await prisma.role.findUnique({
       where: { name }
@@ -130,7 +117,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         description,
-        permissions: userPermissionsOnly
+        permissions: permissions // 使用原始权限列表，保留可能包含的管理员权限
       }
     });
 

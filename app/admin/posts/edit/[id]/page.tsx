@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 
 interface PostData {
@@ -56,7 +56,7 @@ interface PageProps {
 export default function EditPostPage(props: PageProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { hasPermission, isAdmin, userPermissions } = useAuthPermissions();
+  const { hasPermission, isAdmin } = useAuthPermissions();
   const { data: session } = useSession();
   
   // 状态变量
@@ -107,9 +107,8 @@ export default function EditPostPage(props: PageProps) {
     
     // 打印用户权限
     console.log("[EditPost] 权限检查:", {
-      isAdmin,
-      hasEditPermission: hasPermission(Permission.EDIT_POST),
-      allPermissions: userPermissions,
+      isAdmin: isAdmin(),
+      hasEditPermission: hasPermission(AdminPermission.ADMIN_ACCESS),
       userEmail: session?.user?.email,
       adminEmailsConfig: process.env.NEXT_PUBLIC_ADMIN_EMAILS,
       isAdminByEmail
@@ -128,7 +127,7 @@ export default function EditPostPage(props: PageProps) {
     }
     
     // 如果是管理员或有编辑权限，则允许访问
-    if (isAdmin || hasPermission(Permission.EDIT_POST)) {
+    if (isAdmin() || hasPermission(AdminPermission.ADMIN_ACCESS)) {
       console.log("[EditPost] 用户有权限编辑帖子");
       return; // 有权限，直接返回
     }
@@ -141,7 +140,7 @@ export default function EditPostPage(props: PageProps) {
       variant: "destructive",
     });
     router.push("/admin/posts");
-  }, [hasPermission, isAdmin, router, toast, userPermissions, session, status]);
+  }, [hasPermission, isAdmin, router, toast, session, status]);
   
   // 获取帖子数据
   useEffect(() => {

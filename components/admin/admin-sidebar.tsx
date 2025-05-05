@@ -22,6 +22,9 @@ import {
   ChevronLeft,
   Tag,
   Link as LinkIcon,
+  UserCog,
+  UserCheck,
+  FileSymlink,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -82,6 +85,53 @@ export function AdminSidebar() {
   // 创建一个渲染变量，而不是直接返回null
   // 这样可以保持hooks调用的一致性
   const shouldRenderSidebar = isAdmin;
+  
+  // 假设这是管理菜单项的数组
+  const ADMIN_MENU = [
+    {
+      title: "控制台",
+      href: "/admin",
+      icon: LayoutDashboard,
+      permission: AdminPermission.ADMIN_ACCESS,
+    },
+    {
+      title: "用户管理",
+      href: "/admin/users",
+      icon: Users,
+      permission: AdminPermission.VIEW_USERS,
+    },
+    {
+      title: "用户角色分配",
+      href: "/admin/assign-user-roles",
+      icon: UserCog,
+      permission: [AdminPermission.VIEW_USERS, AdminPermission.EDIT_USER],
+      requireAll: true,
+    },
+    {
+      title: "用户角色",
+      href: "/admin/user-roles",
+      icon: UserCheck,
+      permission: AdminPermission.VIEW_ROLES,
+    },
+    {
+      title: "论坛管理",
+      href: "/admin/forum",
+      icon: MessageSquare,
+      permission: AdminPermission.VIEW_POSTS,
+    },
+    {
+      title: "资源管理",
+      href: "/admin/resources",
+      icon: FileSymlink,
+      permission: AdminPermission.VIEW_FILES,
+    },
+    {
+      title: "系统设置",
+      href: "/admin/settings",
+      icon: Settings,
+      permission: AdminPermission.VIEW_SETTINGS,
+    },
+  ];
   
   // 渲染侧边栏内容，但根据shouldRenderSidebar决定是否显示
   return shouldRenderSidebar ? (
@@ -193,14 +243,14 @@ export function AdminSidebar() {
                 permission={AdminPermission.VIEW_USERS}
               />
               <SidebarItem
-                icon={<ShieldCheck size={20} />}
-                label="管理员角色"
-                href="/admin/admin-roles"
-                isActive={pathname.startsWith("/admin/admin-roles")}
-                permission={AdminPermission.VIEW_ROLES}
+                icon={<UserCog size={20} />}
+                label="用户角色分配"
+                href="/admin/assign-user-roles"
+                isActive={pathname.startsWith("/admin/assign-user-roles")}
+                permission={[AdminPermission.VIEW_USERS, AdminPermission.EDIT_USER]}
               />
               <SidebarItem
-                icon={<ShieldCheck size={20} />}
+                icon={<UserCheck size={20} />}
                 label="用户角色"
                 href="/admin/user-roles"
                 isActive={pathname.startsWith("/admin/user-roles")}

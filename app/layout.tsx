@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { LoaderProvider } from "@/contexts/loader-context";
 import { LoadingOverlay } from "@/components/loading-overlay";
 import { ThemeProvider } from "@/components/ui/theme-provider";
+import { AppProviders } from "@/components/providers/app-providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,8 +19,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "PonyKnows",
-  description: "PonyKnows - 知识分享平台",
+  title: "PonyKnows - 知识库与资源共享系统",
+  description: "高效的企业知识库与资源管理平台",
 };
 
 export default function RootLayout({
@@ -41,9 +42,11 @@ export default function RootLayout({
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <LoadingOverlay />
             <Providers>
-              <ClientLayout>{children}</ClientLayout>
-              <HandlePermissionSync />
-              <Toaster />
+              <AppProviders>
+                <ClientLayout>{children}</ClientLayout>
+                <HandlePermissionSync />
+                <Toaster />
+              </AppProviders>
             </Providers>
           </ThemeProvider>
         </LoaderProvider>

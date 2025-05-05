@@ -13,7 +13,7 @@ export async function GET(
 ) {
   try {
     // 确保提前解析params.id
-    const roleId = params.id;
+    const roleId = await Promise.resolve(params.id);
     
     // 检查权限
     const session = await getServerSession(authOptions);
@@ -29,8 +29,8 @@ export async function GET(
 
     const userPermissions = userRoles.flatMap(ur => ur.role.permissions);
 
-    // 验证是否有查看角色的权限
-    if (!hasPermission(userPermissions, AdminPermission.VIEW_ROLES)) {
+    // 验证是否有管理员权限
+    if (!hasPermission(userPermissions, AdminPermission.ADMIN_ACCESS)) {
       return NextResponse.json({ error: '没有查看角色的权限' }, { status: 403 });
     }
 
@@ -41,11 +41,6 @@ export async function GET(
 
     if (!role) {
       return NextResponse.json({ error: '角色不存在' }, { status: 404 });
-    }
-
-    // 验证是否为用户角色（不包含管理员权限）
-    if (role.permissions.includes(AdminPermission.ADMIN_ACCESS)) {
-      return NextResponse.json({ error: '不是用户角色' }, { status: 400 });
     }
 
     return NextResponse.json(role);
@@ -65,7 +60,7 @@ export async function PUT(
 ) {
   try {
     // 确保提前解析params.id
-    const roleId = params.id;
+    const roleId = await Promise.resolve(params.id);
     
     // 检查权限
     const session = await getServerSession(authOptions);
@@ -81,8 +76,8 @@ export async function PUT(
 
     const userPermissions = userRoles.flatMap(ur => ur.role.permissions);
 
-    // 验证是否有编辑角色的权限
-    if (!hasPermission(userPermissions, AdminPermission.EDIT_ROLE)) {
+    // 验证是否有管理员权限
+    if (!hasPermission(userPermissions, AdminPermission.ADMIN_ACCESS)) {
       return NextResponse.json({ error: '没有编辑角色的权限' }, { status: 403 });
     }
 
@@ -103,11 +98,6 @@ export async function PUT(
         { status: 400 }
       );
     }
-
-    // 确保用户角色不包含管理员权限
-    const userPermissionsOnly = permissions.filter(
-      permission => permission !== AdminPermission.ADMIN_ACCESS
-    );
 
     // 检查角色是否存在
     const existingRole = await prisma.role.findUnique({
@@ -141,7 +131,7 @@ export async function PUT(
       data: {
         name,
         description,
-        permissions: userPermissionsOnly
+        permissions
       }
     });
 
@@ -174,7 +164,7 @@ export async function DELETE(
 ) {
   try {
     // 确保提前解析params.id
-    const roleId = params.id;
+    const roleId = await Promise.resolve(params.id);
     
     // 检查权限
     const session = await getServerSession(authOptions);
@@ -190,8 +180,8 @@ export async function DELETE(
 
     const userPermissions = userRoles.flatMap(ur => ur.role.permissions);
 
-    // 验证是否有删除角色的权限
-    if (!hasPermission(userPermissions, AdminPermission.DELETE_ROLE)) {
+    // 验证是否有管理员权限
+    if (!hasPermission(userPermissions, AdminPermission.ADMIN_ACCESS)) {
       return NextResponse.json({ error: '没有删除角色的权限' }, { status: 403 });
     }
 

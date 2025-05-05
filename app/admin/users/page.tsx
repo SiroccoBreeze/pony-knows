@@ -44,9 +44,12 @@ import {
   Edit, 
   Check,
   X,
+  Pencil,
+  UserMinus,
+  UserCog,
 } from "lucide-react";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 
 interface User {
   id: string;
@@ -353,6 +356,48 @@ export default function UsersPage() {
     }
   }
 
+  // 切换用户状态 (启用/禁用)
+  async function handleUserStatusToggle(user: User) {
+    try {
+      const newStatus = !user.isActive;
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          isActive: newStatus
+        }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `${newStatus ? '启用' : '禁用'}用户失败`);
+      }
+      
+      fetchUsers();
+      
+      toast({
+        title: "成功",
+        description: `已${newStatus ? '启用' : '禁用'}用户 ${user.name || user.email}`
+      });
+    } catch (error) {
+      console.error("更新用户状态失败:", error);
+      toast({
+        title: "错误",
+        description: error instanceof Error ? error.message : "操作失败，请稍后再试",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // 删除用户确认
+  function handleDeleteConfirm(userId: string) {
+    if (confirm(`确定要删除此用户吗？此操作不可撤销。`)) {
+      handleDeleteUser(userId);
+    }
+  }
+
   // 根据状态获取标签样式
   function getStatusBadge(status: string) {
     switch(status) {
@@ -372,7 +417,7 @@ export default function UsersPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">用户管理</h1>
         
-        {hasPermission(Permission.CREATE_USER) && (
+        {hasPermission(AdminPermission.ADMIN_ACCESS) && (
           <Button onClick={handleAddUser}>
             <UserPlus className="mr-2 h-4 w-4" />
             添加用户
@@ -473,7 +518,7 @@ export default function UsersPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              {user.status === "pending" && hasPermission(Permission.EDIT_USER) && (
+                              {user.status === "pending" && hasPermission(AdminPermission.ADMIN_ACCESS) && (
                                 <>
                                   <Button
                                     variant="outline"
@@ -495,24 +540,39 @@ export default function UsersPage() {
                                   </Button>
                                 </>
                               )}
-                              {hasPermission(Permission.EDIT_USER) && (
+                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
                                 <Button
                                   variant="ghost"
-                                  size="icon"
+                                  size="sm"
                                   onClick={() => handleEditUser(user)}
+                                  className="h-8 w-8 p-0"
                                 >
-                                  <Edit className="h-4 w-4" />
-                                  <span className="sr-only">编辑</span>
+                                  <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
-                              {hasPermission(Permission.DELETE_USER) && (
+                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
                                 <Button
                                   variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteUser(user.id)}
+                                  size="sm"
+                                  onClick={() => handleUserStatusToggle(user)}
+                                  className="h-8 w-8 p-0"
+                                  title={user.isActive ? "禁用用户" : "启用用户"}
+                                >
+                                  {user.isActive ? (
+                                    <UserMinus className="h-4 w-4" />
+                                  ) : (
+                                    <UserCog className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteConfirm(user.id)}
+                                  className="h-8 w-8 p-0 text-destructive"
                                 >
                                   <Trash className="h-4 w-4" />
-                                  <span className="sr-only">删除</span>
                                 </Button>
                               )}
                             </div>

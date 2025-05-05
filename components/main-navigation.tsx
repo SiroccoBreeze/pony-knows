@@ -27,7 +27,12 @@ export function MainNavigation() {
   return (
     <div className="flex items-center space-x-2 px-1">
       <NavigationItem href="/" label="首页" icon={<Home className="h-4 w-4" />} />
-      <NavigationItem href="/Manuscript" label="实施底稿" icon={<FileText className="h-4 w-4" />} />
+      <NavigationItem 
+        href="/Manuscript" 
+        label="实施底稿" 
+        icon={<FileText className="h-4 w-4" />} 
+        permission={UserPermission.ACCESS_WORKING_PAPERS}
+      />
       
       {/* 论坛导航项 - 直接根据状态显示，避免NavigationItem的二次权限检查 */}
       {showForumTab && (
@@ -35,6 +40,7 @@ export function MainNavigation() {
           href="/forum" 
           label="论坛" 
           icon={<MessageCircle className="h-4 w-4" />} 
+          permission={UserPermission.VIEW_FORUM}
         />
       )}
       
