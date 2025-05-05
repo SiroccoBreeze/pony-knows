@@ -17,10 +17,11 @@ declare module "next-auth" {
           permissions: string[];
         }
       }[];
+      permissions?: string[]; // 添加permissions字段
     } & DefaultSession["user"]
   }
   
-  // 扩展JWT类型以明确包含roles
+  // 扩展JWT类型以明确包含roles和permissions
   interface JWT {
     id: string;
     roles?: {
@@ -29,6 +30,7 @@ declare module "next-auth" {
         permissions: string[];
       }
     }[];
+    permissions?: string[]; // 添加permissions字段
   }
 }
 
@@ -102,7 +104,7 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       // 记录触发JWT回调的原因
       console.log(`[JWT回调] 触发原因: ${trigger || 'initial'}`);
       
@@ -146,7 +148,7 @@ export const authOptions: NextAuthOptions = {
             const cleanRoles = JSON.parse(JSON.stringify(roles));
             token.roles = cleanRoles;
             
-            // 记录权限信息
+            // 提取并整合所有权限
             const allPermissions = [];
             for (const userRole of cleanRoles) {
               if (userRole.role.permissions) {
@@ -154,18 +156,35 @@ export const authOptions: NextAuthOptions = {
               }
             }
             
-            console.log(`[JWT回调] 用户权限: ${allPermissions.join(', ')}`);
-            console.log(`[JWT回调] 是否有管理员权限: ${allPermissions.includes('admin_access')}`);
-            console.log(`[JWT回调] Token:`, JSON.stringify(token, null, 2));
+            // 保存去重的权限数组到token
+            token.permissions = [...new Set(allPermissions)];
+            
+            console.log(`[JWT回调] 用户权限: ${token.permissions.join(', ')}`);
+            console.log(`[JWT回调] 是否有管理员权限: ${token.permissions.includes('admin_access')}`);
           } else {
             console.log("[JWT回调] 用户没有角色或权限");
+            token.roles = [];
+            token.permissions = [];
           }
         } catch (error) {
           console.error("[JWT回调] 获取用户角色时出错:", error);
+          token.roles = [];
+          token.permissions = [];
         }
-      } else if (trigger === 'update') {
-        // 如果是更新操作，保留现有的id和roles
-        console.log("[JWT回调] 更新会话，保留现有token数据");
+      } else if (trigger === 'update' && session) {
+        // 处理会话更新
+        console.log("[JWT回调] 处理会话更新");
+        
+        // 如果是update操作并且session中包含roles和permissions，则更新token
+        if (session.roles) {
+          console.log("[JWT回调] 从session获取新的roles", session.roles?.length);
+          token.roles = session.roles;
+        }
+        
+        if (session.permissions) {
+          console.log("[JWT回调] 从session获取新的permissions", session.permissions?.length);
+          token.permissions = session.permissions;
+        }
       }
       
       return token;
@@ -184,15 +203,24 @@ export const authOptions: NextAuthOptions = {
             }
           }[];
           
-          // 打印会话中的权限
-          const permissions = [];
-          for (const role of session.user.roles) {
-            permissions.push(...(role.role.permissions || []));
+          // 添加权限数组到session
+          if (token.permissions) {
+            session.user.permissions = token.permissions as string[];
+            console.log(`[Session回调] 会话中的权限: ${session.user.permissions.join(', ')}`);
+            console.log(`[Session回调] 会话中是否有admin_access权限: ${session.user.permissions.includes('admin_access')}`);
+          } else {
+            // 如果token中没有permissions字段，从roles中提取
+            const permissions = [];
+            for (const role of session.user.roles) {
+              permissions.push(...(role.role.permissions || []));
+            }
+            session.user.permissions = [...new Set(permissions)];
+            console.log(`[Session回调] 会话中的权限(从roles提取): ${session.user.permissions.join(', ')}`);
           }
-          console.log(`[Session回调] 会话中的权限: ${permissions.join(', ')}`);
-          console.log(`[Session回调] 会话中是否有admin_access权限: ${permissions.includes('admin_access')}`);
         } else {
-          console.log("[Session回调] Token中没有角色信息");
+          console.log("[Session回调] Token中没有角色信息，设置空角色和权限");
+          session.user.roles = [];
+          session.user.permissions = [];
         }
       }
       return session;

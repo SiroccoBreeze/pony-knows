@@ -10,9 +10,8 @@ interface CachedData {
   timestamp: number;
 }
 
-// 创建一个服务器端缓存，避免频繁查询数据库
+// 创建一个服务器端缓存对象
 const API_CACHE = new Map<string, CachedData>();
-const CACHE_DURATION = 15000; // 15秒缓存有效期
 
 export async function GET(request: Request) {
   try {
@@ -33,23 +32,13 @@ export async function GET(request: Request) {
     // 检查请求头
     const headers = new Headers(request.headers);
     const isForceRefresh = headers.get('X-Force-Refresh') === 'true';
+    const timestamp = headers.get('X-Timestamp') || Date.now().toString();
+
+    console.log(`[API] 权限请求 - 用户:${userId}, 强制刷新:${isForceRefresh}, 时间戳:${timestamp}`);
     
-    // 检查缓存，除非是强制刷新请求
+    // 总是清除用户缓存，确保每次都从数据库获取最新数据
     const cacheKey = `auth_debug_${userId}`;
-    if (!isForceRefresh && API_CACHE.has(cacheKey)) {
-      const cached = API_CACHE.get(cacheKey);
-      if ((Date.now() - cached!.timestamp) < CACHE_DURATION) {
-        // 使用缓存数据
-        console.log(`[API] 使用缓存数据，用户 ${userId}`);
-        return NextResponse.json(cached!.data);
-      }
-    }
-    
-    if (isForceRefresh) {
-      console.log(`[API] 强制刷新权限数据，用户 ${userId}`);
-      // 清除缓存
-      API_CACHE.delete(cacheKey);
-    }
+    API_CACHE.delete(cacheKey);
     
     // 直接从数据库查询用户的角色和权限
     const userData = await prisma.user.findUnique({
@@ -63,9 +52,17 @@ export async function GET(request: Request) {
       }
     });
     
+    if (!userData) {
+      console.error(`[API] 找不到用户数据, 用户ID: ${userId}`);
+      return NextResponse.json(
+        { error: "找不到用户数据", authenticated: false },
+        { status: 404 }
+      );
+    }
+    
     // 提取所有权限到一个数组
     const permissions: string[] = [];
-    userData?.userRoles.forEach(userRole => {
+    userData.userRoles.forEach(userRole => {
       if (userRole.role.permissions) {
         permissions.push(...userRole.role.permissions);
       }
@@ -79,19 +76,22 @@ export async function GET(request: Request) {
       authenticated: true,
       sessionUserId: userId,
       dbUser: {
-        id: userData?.id,
-        email: userData?.email,
-        name: userData?.name
+        id: userData.id,
+        email: userData.email,
+        name: userData.name
       },
-      roles: userData?.userRoles.map(ur => ({
+      roles: userData.userRoles.map(ur => ({
         roleName: ur.role.name,
         permissions: ur.role.permissions
       })),
       permissions: [...new Set(permissions)],
       hasAdminAccess,
       refreshedAt: new Date().toISOString(),
-      isForceRefresh
+      isForceRefresh,
+      queryTimestamp: timestamp
     };
+    
+    console.log(`[API] 权限刷新完成 - 用户:${userId}, 权限数量:${permissions.length}`);
     
     // 更新缓存
     API_CACHE.set(cacheKey, {
@@ -99,11 +99,13 @@ export async function GET(request: Request) {
       timestamp: Date.now()
     });
     
-    // 返回调试信息
+    // 返回调试信息，并设置响应头阻止缓存
     return NextResponse.json(responseData, {
       headers: {
-        'Cache-Control': isForceRefresh ? 'no-store' : 'private, max-age=15',
-        'Expires': isForceRefresh ? '0' : new Date(Date.now() + 15000).toUTCString()
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
       }
     });
     

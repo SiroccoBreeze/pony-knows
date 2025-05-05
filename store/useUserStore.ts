@@ -20,6 +20,7 @@ interface UserState {
   login: (user: User) => void
   logout: () => void
   updateUser: (userData: Partial<User>) => void
+  resetPermissions: () => void
 }
 
 export const useUserStore = create<UserState>()(
@@ -31,6 +32,18 @@ export const useUserStore = create<UserState>()(
       logout: () => set({ user: null, isLoggedIn: false }),
       updateUser: (userData) => set((state) => ({
         user: state.user ? { ...state.user, ...userData } : null
+      })),
+      resetPermissions: () => set((state) => ({
+        user: state.user ? { 
+          ...state.user, 
+          permissions: [], 
+          roles: state.user.roles?.map(role => ({
+            role: {
+              ...role.role,
+              permissions: []
+            }
+          }))
+        } : null
       }))
     }),
     {
