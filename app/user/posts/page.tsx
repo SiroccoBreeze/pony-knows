@@ -12,6 +12,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Pagination } from "@/components/ui/pagination";
 import { isMobileDevice, getPreviewText } from "@/lib/utils";
+import { useAuthPermissions } from "@/hooks/use-auth-permissions";
+import { UserPermission } from "@/lib/permissions";
 
 // 定义帖子类型
 interface Post {
@@ -58,6 +60,7 @@ export default function PostsPage() {
   const { data: session, status, update: updateSession } = useSession() as { data: ExtendedSession | null; status: string; update: () => Promise<ExtendedSession | null> };
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
+  const { hasPermission } = useAuthPermissions();
 
   // 从URL获取tab参数和页码
   useEffect(() => {
@@ -227,7 +230,7 @@ export default function PostsPage() {
     <div className="container mx-auto py-8 px-4 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">帖子管理</h1>
-        {!isMobile && (
+        {!isMobile && hasPermission(UserPermission.CREATE_TOPIC) && (
           <Button>
             <Link href="/forum/new" className="flex items-center gap-2">
               发布新帖子
@@ -235,8 +238,8 @@ export default function PostsPage() {
           </Button>
         )}
       </div>
-      {/* 移动端提示 */}
-      {isMobile && (
+      {/* 移动端提示 - 仅当有发帖权限时显示 */}
+      {isMobile && hasPermission(UserPermission.CREATE_TOPIC) && (
         <div className="bg-muted/30 p-4 rounded-lg mb-4">
           <p className="text-sm text-muted-foreground">
             移动端仅支持浏览功能，如需编辑或删除帖子请使用桌面端访问。

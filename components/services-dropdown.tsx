@@ -79,11 +79,11 @@ export function ServicesDropdown() {
     // 标记为已检查
     permissionChecked.current = true;
     
-    // 使用客户端缓存的权限进行一次性检查
-    const hasServiceAccess = hasPermission(UserPermission.VIEW_SERVICES);
+    // 使用客户端缓存的权限进行一次性检查 - 只要有任何一种服务权限就显示菜单
     const hasDatabaseAccess = hasPermission(UserPermission.ACCESS_DATABASE);
     const hasMinioAccess = hasPermission(UserPermission.ACCESS_MINIO);
     const hasFileDownloadAccess = hasPermission(UserPermission.ACCESS_FILE_DOWNLOADS);
+    const hasServiceAccess = hasPermission(UserPermission.VIEW_SERVICES);
     
     // 只要有任何一种服务权限就显示菜单
     const hasAnyServicePermission = hasServiceAccess || hasDatabaseAccess || 
@@ -103,7 +103,7 @@ export function ServicesDropdown() {
             服务
           </NavigationMenuTrigger>
           <NavigationMenuContent>
-            <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 bg-white shadow-lg rounded-xl border border-border/40">
+            <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 bg-background shadow-lg rounded-xl border border-border/40">
               {/* 全部服务 - 基本服务权限就可访问 */}
               <ListItem 
                 href="/services" 

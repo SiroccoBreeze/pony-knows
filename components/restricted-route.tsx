@@ -3,10 +3,10 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import { useRouter } from "next/navigation";
-import { Permission, AdminPermission, UserPermission } from "@/lib/permissions";
+import { AdminPermission, UserPermission } from "@/lib/permissions";
 import { FullScreenPermissionLoading } from "./ui/permission-loading";
 
-type PermissionType = string | Permission | AdminPermission | UserPermission;
+type PermissionType = string | AdminPermission | UserPermission;
 
 interface RestrictedRouteProps {
   /**
@@ -95,7 +95,22 @@ export function RestrictedRoute({
     
     // 如果无权限访问，重定向到指定页面
     if (!accessGranted) {
-      router.push(redirectTo);
+      // 如果已指定了重定向路径，直接使用它
+      if (redirectTo !== "/404") {
+        router.push(redirectTo);
+      } else {
+        // 否则重定向到权限拒绝页面，附带权限信息
+        let permissionParam = "";
+        if (typeof permission === 'string') {
+          permissionParam = permission;
+        } else if (Array.isArray(permission) && permission.length > 0) {
+          permissionParam = permission[0] as string;
+        }
+        
+        // 构建带有权限信息的URL
+        const redirectUrl = `/permissions-denied?permission=${permissionParam}`;
+        router.push(redirectUrl);
+      }
     }
   }, [
     permission, 

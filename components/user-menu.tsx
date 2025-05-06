@@ -21,7 +21,7 @@ import {
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RestrictAccess } from "./ui/restrict-access";
-import { AdminPermission } from "@/lib/permissions";
+import { AdminPermission, UserPermission } from "@/lib/permissions";
 
 interface UserMenuProps {
   user: User;
@@ -56,12 +56,14 @@ export function UserMenu({ user }: UserMenuProps) {
           </div>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/user/profile" className="flex items-center">
-            <UserIcon className="mr-2 h-4 w-4" />
-            个人资料
-          </Link>
-        </DropdownMenuItem>
+        <RestrictAccess permission={UserPermission.VIEW_PROFILE}>
+          <DropdownMenuItem asChild>
+            <Link href="/user/profile" className="flex items-center">
+              <UserIcon className="mr-2 h-4 w-4" />
+              个人资料
+            </Link>
+          </DropdownMenuItem>
+        </RestrictAccess>
         <DropdownMenuItem asChild>
           <Link href="/user/posts" className="flex items-center">
             <FileText className="mr-2 h-4 w-4" />

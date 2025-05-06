@@ -55,7 +55,7 @@ export async function GET() {
     const isAdmin = permissions.includes(AdminPermission.ADMIN_ACCESS);
     
     // 如果是管理员，返回所有链接；否则只返回激活的链接
-    const links = await prisma.link.findMany({
+    const links = await prisma.externalLink.findMany({
       where: isAdmin ? {} : { isActive: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const newLink = await prisma.link.create({
+    const newLink = await prisma.externalLink.create({
       data: {
         title: data.title,
         url: data.url,

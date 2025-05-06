@@ -142,7 +142,9 @@ export default function FileLinksPage() {
         title: '成功',
         description: '链接已删除',
       });
-      fetchLinks();
+      
+      // 直接更新本地状态，而不是重新获取
+      setLinks(links.filter(link => link.id !== id));
     } catch (error) {
       console.error('删除链接错误:', error);
       toast({

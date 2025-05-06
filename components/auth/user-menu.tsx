@@ -16,6 +16,8 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import type { User } from "@/store/useUserStore";
 import Link from "next/link";
+import { RestrictAccess } from "@/components/ui/restrict-access";
+import { UserPermission } from "@/lib/permissions";
 
 interface UserMenuProps {
   user: User;
@@ -53,14 +55,16 @@ export function UserMenu({ user }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/user/profile">
-            <div className="flex items-center cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>用户管理</span>
-            </div>
-          </Link>
-        </DropdownMenuItem>
+        <RestrictAccess permission={UserPermission.VIEW_PROFILE}>
+          <DropdownMenuItem asChild>
+            <Link href="/user/profile">
+              <div className="flex items-center cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>用户管理</span>
+              </div>
+            </Link>
+          </DropdownMenuItem>
+        </RestrictAccess>
         <DropdownMenuItem 
           onClick={handleLogout}
           disabled={isLoggingOut}

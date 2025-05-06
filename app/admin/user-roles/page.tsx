@@ -95,6 +95,9 @@ const PERMISSION_GROUPS = [
   },
 ];
 
+// 获取系统支持的所有权限列表
+const ALL_VALID_PERMISSIONS = PERMISSION_GROUPS.flatMap(group => group.permissions) as string[];
+
 // 获取权限显示名称
 function getPermissionName(permission: string): string {
   switch (permission) {
@@ -246,8 +249,8 @@ export default function UserRolesPage() {
         description: "角色已删除",
       });
       
-      // 刷新角色列表
-      fetchRoles();
+      // 直接更新本地状态，而不是重新获取
+      setRoles(roles.filter(role => role.id !== deleteRoleId));
     } catch (error) {
       console.error("删除角色失败:", error);
       toast({
@@ -285,6 +288,17 @@ export default function UserRolesPage() {
         return;
       }
       
+      // 过滤权限，只保留有效的权限
+      const validPermissions = formData.permissions.filter(
+        perm => ALL_VALID_PERMISSIONS.includes(perm as any)
+      );
+      
+      if (validPermissions.length !== formData.permissions.length) {
+        console.warn('过滤掉了无效权限:', 
+          formData.permissions.filter(p => !validPermissions.includes(p))
+        );
+      }
+      
       const url = isEditMode
         ? `/api/admin/user-roles/${formData.id}`
         : "/api/admin/user-roles";
@@ -298,7 +312,7 @@ export default function UserRolesPage() {
         body: JSON.stringify({
           name: formData.name,
           description: formData.description,
-          permissions: formData.permissions,
+          permissions: validPermissions,
           type: "user", // 标记为用户角色
         }),
       });
@@ -313,9 +327,34 @@ export default function UserRolesPage() {
         description: isEditMode ? "角色已更新" : "角色已创建",
       });
       
-      // 关闭对话框并刷新角色列表
+      // 关闭对话框并直接更新本地状态
       setIsDialogOpen(false);
-      fetchRoles();
+      
+      if (isEditMode) {
+        // 更新现有角色
+        const updatedData = await response.json();
+        const updatedRole = updatedData.role || updatedData;
+        
+        setRoles(roles.map(role => 
+          role.id === formData.id ? { 
+            ...updatedRole,
+            userCount: role.userCount || 0 // 保留原有的用户数量数据
+          } : role
+        ));
+      } else {
+        // 添加新角色
+        const newData = await response.json();
+        const newRole = newData.role || newData;
+        
+        // 确保新角色有完整的数据结构
+        const roleToAdd = {
+          ...newRole,
+          userCount: 0, // 新角色默认没有用户
+          permissions: newRole.permissions || [],
+        };
+        
+        setRoles([roleToAdd, ...roles]);
+      }
     } catch (error) {
       console.error("保存角色失败:", error);
       toast({
@@ -328,6 +367,12 @@ export default function UserRolesPage() {
   
   // 处理权限复选框变化
   function handlePermissionChange(permission: string, checked: boolean) {
+    // 确保只添加有效的权限
+    if (checked && !ALL_VALID_PERMISSIONS.includes(permission as any)) {
+      console.warn('尝试添加无效的权限:', permission);
+      return;
+    }
+    
     setFormData((prev) => {
       const permissions = [...prev.permissions];
       

@@ -3,12 +3,12 @@
 import { RestrictedRoute } from "@/components/restricted-route";
 import { UserPermission } from "@/lib/permissions";
 
-export default function FileDownloadsLayout({ children }: { children: React.ReactNode }) {
+export default function DatabaseLayout({ children }: { children: React.ReactNode }) {
   return (
     <RestrictedRoute 
-      permission={UserPermission.ACCESS_FILE_DOWNLOADS}
+      permission={UserPermission.ACCESS_DATABASE}
       redirectTo="/services"
-      loadingMessage="验证文件下载访问权限中..."
+      loadingMessage="验证数据库访问权限中..."
     >
       {children}
     </RestrictedRoute>

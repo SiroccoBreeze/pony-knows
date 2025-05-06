@@ -4,8 +4,7 @@ import { useSession } from "next-auth/react"
 import { useEffect, useState, useCallback, useRef } from "react"
 import { 
   AdminPermission, 
-  UserPermission, 
-  Permission
+  UserPermission
 } from "@/lib/permissions"
 
 interface ApiDebugResponse {
@@ -18,7 +17,7 @@ interface ApiDebugResponse {
 // 增加全局缓存，跨组件共享权限数据
 let globalPermissionsCache: string[] | null = null;
 let globalCacheTimestamp: number = 0;
-const GLOBAL_CACHE_DURATION = 5000; // 降低全局缓存时间为5秒有效
+const GLOBAL_CACHE_DURATION = 1000; // 降低全局缓存时间为1秒有效，更及时刷新权限
 
 // 添加一个重置全局缓存的函数
 export function resetGlobalPermissionsCache() {
@@ -54,20 +53,20 @@ export function useAuthPermissions() {
       !forceRefresh && 
       globalPermissionsCache && 
       (now - globalCacheTimestamp) < GLOBAL_CACHE_DURATION &&
-      (now - lastRefreshTime.current) > 60000 // 一分钟内强制刷新过则不使用缓存
+      (now - lastRefreshTime.current) > 30000 // 30秒内强制刷新过则不使用缓存
     ) {
       console.log('使用全局缓存的权限数据');
       return globalPermissionsCache;
     }
     
     // 使用本地存储缓存
-    const CACHE_DURATION = 5000; // 降低缓存时间为5秒
+    const CACHE_DURATION = 1000; // 降低缓存时间为1秒
     
     try {
-      // 如果未强制刷新、缓存有效、且一分钟内未强制刷新过，使用缓存权限
+      // 如果未强制刷新、缓存有效、且30秒内未强制刷新过，使用缓存权限
       if (
         !forceRefresh && 
-        (now - lastRefreshTime.current) > 60000
+        (now - lastRefreshTime.current) > 30000
       ) {
         const cachedPermissionsData = localStorage.getItem('cached_permissions');
         const cachedTimestamp = localStorage.getItem('cached_permissions_timestamp');
@@ -197,7 +196,7 @@ export function useAuthPermissions() {
   }, [session, status, fetchServerPermissions])
 
   // 检查是否具有指定权限
-  const hasPermission = useCallback((permission: string | Permission | AdminPermission | UserPermission): boolean => {
+  const hasPermission = useCallback((permission: string | AdminPermission | UserPermission): boolean => {
     // 如果正在加载中，默认返回false
     if (isLoading || isSyncing) return false;
     
@@ -206,7 +205,7 @@ export function useAuthPermissions() {
   }, [isLoading, isSyncing, permissions]);
 
   // 检查是否具有任意一个指定权限
-  const hasAnyPermission = useCallback((requiredPermissions: (string | Permission | AdminPermission | UserPermission)[]): boolean => {
+  const hasAnyPermission = useCallback((requiredPermissions: (string | AdminPermission | UserPermission)[]): boolean => {
     // 如果正在加载中，默认返回false
     if (isLoading || isSyncing) return false;
     
@@ -215,7 +214,7 @@ export function useAuthPermissions() {
   }, [isLoading, isSyncing, permissions]);
 
   // 检查是否具有所有指定权限
-  const hasAllPermissions = useCallback((requiredPermissions: (string | Permission | AdminPermission | UserPermission)[]): boolean => {
+  const hasAllPermissions = useCallback((requiredPermissions: (string | AdminPermission | UserPermission)[]): boolean => {
     // 如果正在加载中，默认返回false
     if (isLoading || isSyncing) return false;
     
