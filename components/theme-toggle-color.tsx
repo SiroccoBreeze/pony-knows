@@ -55,7 +55,7 @@ export function ThemeToggleColor() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon">
+      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent">
         <Palette className="h-4 w-4" />
         <span className="sr-only">切换主题颜色</span>
       </Button>
@@ -65,7 +65,7 @@ export function ThemeToggleColor() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground hover:bg-transparent">
           <Palette className="h-4 w-4" />
           <span className="sr-only">切换主题颜色</span>
         </Button>

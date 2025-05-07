@@ -130,8 +130,10 @@ const Navbar = () => {
 
           {/* 登录按钮和主题切换 */}
           <div className="flex items-center space-x-4">
-            <ThemeToggle />
-            <ThemeToggleColor />
+            <div className="flex items-center space-x-1">
+              <ThemeToggle />
+              <ThemeToggleColor />
+            </div>
             {isLoggedIn && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

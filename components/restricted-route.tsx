@@ -97,7 +97,7 @@ export function RestrictedRoute({
     if (!accessGranted) {
       // 如果已指定了重定向路径，直接使用它
       if (redirectTo !== "/404") {
-        router.push(redirectTo);
+      router.push(redirectTo);
       } else {
         // 否则重定向到权限拒绝页面，附带权限信息
         let permissionParam = "";

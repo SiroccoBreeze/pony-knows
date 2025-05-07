@@ -11,16 +11,16 @@ export default function ServicesLayout({ children }: { children: ReactNode }) {
   // 只有访问根服务页面 /services 时才检查 VIEW_SERVICES 权限
   // 子页面如 /services/database 都有自己的权限检查，这里不做限制
   if (pathname === "/services") {
-    return (
-      <RestrictedRoute 
-        permission={UserPermission.VIEW_SERVICES}
-        redirectTo="/404"
-        loadingMessage="验证服务访问权限中..."
-      >
-        <div className="container mx-auto py-8 px-4">
-          {children}
-        </div>
-      </RestrictedRoute>
+  return (
+    <RestrictedRoute 
+      permission={UserPermission.VIEW_SERVICES}
+      redirectTo="/404"
+      loadingMessage="验证服务访问权限中..."
+    >
+      <div className="container mx-auto py-8 px-4">
+        {children}
+      </div>
+    </RestrictedRoute>
     );
   }
   

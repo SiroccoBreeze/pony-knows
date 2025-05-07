@@ -487,7 +487,7 @@ export default function CommentList({ postId }: CommentListProps) {
             disabled={!session || isSubmitting}
             className="min-h-[70px] text-sm resize-none"
           />
-          <div className="flex justify-end">
+          <div className="flex justify-end space-x-2">
             <Button
               type="submit"
               disabled={!session || isSubmitting}

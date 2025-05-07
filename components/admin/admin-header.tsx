@@ -16,18 +16,13 @@ import { Bell, LogOut, Settings, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut, useSession } from "next-auth/react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggleColor } from "@/components/theme-toggle-color";
 import { AdminPermission } from "@/lib/permissions";
 
 export function AdminHeader() {
   const { hasAdminPermission } = useAuthPermissions();
   const { data: session } = useSession();
   const router = useRouter();
-
-  // 检查用户是否有管理员权限
-  const isAdmin = hasAdminPermission(AdminPermission.ADMIN_ACCESS);
-
-  // 创建一个渲染变量，而不是直接返回null
-  const shouldRender = isAdmin;
 
   // 获取用户头像的首字母
   const getInitials = () => {
@@ -45,7 +40,7 @@ export function AdminHeader() {
     router.push("/auth/login");
   };
 
-  return shouldRender ? (
+  return (
     <header className="h-14 border-b flex items-center justify-between px-6 bg-gradient-to-r from-background to-muted/20 shadow-sm">
       <div className="flex-1">
         <h1 className="text-lg font-semibold flex items-center">
@@ -55,6 +50,7 @@ export function AdminHeader() {
       </div>
       <div className="flex items-center space-x-4">
         <ThemeToggle />
+        <ThemeToggleColor />
         <Button variant="ghost" size="icon" className="relative hover:bg-primary/10 transition-colors">
           <Bell size={20} className="text-primary/70" />
           <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-primary animate-pulse"></span>
@@ -99,5 +95,5 @@ export function AdminHeader() {
         </DropdownMenu>
       </div>
     </header>
-  ) : null;
+  );
 } 

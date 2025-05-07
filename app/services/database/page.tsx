@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { CodeHighlighter } from "../../components/CodeHighlighter";
+import { CodeHighlighter } from "@/components/CodeHighlighter";
 
 // 表/视图结构数据类型定义
 interface DbColumn {

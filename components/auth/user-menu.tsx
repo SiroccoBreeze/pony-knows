@@ -56,14 +56,14 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <RestrictAccess permission={UserPermission.VIEW_PROFILE}>
-          <DropdownMenuItem asChild>
-            <Link href="/user/profile">
-              <div className="flex items-center cursor-pointer">
-                <Settings className="mr-2 h-4 w-4" />
-                <span>用户管理</span>
-              </div>
-            </Link>
-          </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/user/profile">
+            <div className="flex items-center cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>用户管理</span>
+            </div>
+          </Link>
+        </DropdownMenuItem>
         </RestrictAccess>
         <DropdownMenuItem 
           onClick={handleLogout}

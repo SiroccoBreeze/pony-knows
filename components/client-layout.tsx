@@ -10,6 +10,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith('/auth');
   const isAdminPage = pathname?.startsWith('/admin');
+  const isHomePage = pathname === '/'; // 判断是否为首页
   const { permissions } = useAuthPermissions();
   
   // 检测用户是否有管理员权限 - 直接使用字符串形式
@@ -31,16 +32,22 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     };
   }, [isAdminPage, isAdmin]);
 
-  // 登录页面始终隐藏导航和页脚
-  const hideNavbarAndFooter = isAuthPage;
+  // 登录页面和管理员页面不显示导航
+  const hideNavbar = isAuthPage || (isAdminPage && isAdmin);
+  
+  // 只在首页显示页脚，或者根据之前的条件
+  const showFooter = isHomePage && !hideNavbar;
+
+  // 不需要添加内边距的情况：登录页面或管理员页面
+  const noPadding = isAuthPage || (isAdminPage && isAdmin);
 
   return (
     <>
-      {!hideNavbarAndFooter && <Navbar />}
-      <main className={`flex-1 ${!hideNavbarAndFooter ? 'pt-16' : ''}`}>
+      {!hideNavbar && <Navbar />}
+      <main className={`flex-1 ${!noPadding ? 'pt-16' : ''}`}>
         {children}
       </main>
-      {!hideNavbarAndFooter && <Footer />}
+      {showFooter && <Footer />}
     </>
   );
 } 

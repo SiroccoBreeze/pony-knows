@@ -1,40 +1,61 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { VditorEditorRef } from "@/components/editor/VditorEditor";
+import dynamic from "next/dynamic";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { AdminPermission } from "@/lib/permissions";
-import { useAuthPermissions } from "@/hooks/use-auth-permissions";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  ArrowLeft,
+  Save,
+  Plus,
+  Check,
+  X
+} from "lucide-react";
+import { useParams } from "next/navigation";
 
-interface PostData {
+// 动态导入编辑器组件，避免SSR问题
+const VditorEditor = dynamic(
+  () => import("@/components/editor/VditorEditor").then((mod) => mod.default), 
+  { ssr: false }
+);
+
+interface Post {
   id: string;
   title: string;
   content: string;
+  createdAt: string;
   status: string;
-  postTags: {
-    tag: {
-      name: string;
-    }
-  }[];
+  reviewStatus: string;
+  author: {
+    id: string;
+    name: string;
+  };
+  postTags?: { tag: Tag }[];
 }
 
 interface Tag {
@@ -42,415 +63,330 @@ interface Tag {
   name: string;
 }
 
-interface PostTag {
-  tag: {
-    name: string;
-  }
-}
-
-// 使用适当的类型限制，避免使用unknown而不是any
-interface PageProps {
-  params: { id: string } | Promise<{ id: string }> | unknown;
-}
-
-export default function EditPostPage(props: PageProps) {
+export default function EditPostPage() {
+  // 使用 useParams 钩子获取路由参数
+  const params = useParams();
+  const id = params.id as string;
+  
   const router = useRouter();
   const { toast } = useToast();
-  const { hasPermission, isAdmin } = useAuthPermissions();
-  const { data: session } = useSession();
+  const editorRef = useRef<VditorEditorRef>(null);
   
-  // 状态变量
-  const [loading, setLoading] = useState(false);
-  const [postId, setPostId] = useState<string>("");
-  const [post, setPost] = useState<PostData | null>(null);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [status, setStatus] = useState("published");
-  const [tags, setTags] = useState<string[]>([]);
-  const [allTags, setAllTags] = useState<Tag[]>([]);
-  const [tagInput, setTagInput] = useState("");
+  const [post, setPost] = useState<Post | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
-  // 从params中提取ID
+  const [editTitle, setEditTitle] = useState("");
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [tagSearchQuery, setTagSearchQuery] = useState("");
+  
+  // 过滤标签
+  const filteredTags = tagSearchQuery 
+    ? availableTags.filter(tag => 
+        tag.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) && 
+        !selectedTags.some(t => t.id === tag.id)
+      )
+    : availableTags.filter(tag => !selectedTags.some(t => t.id === tag.id));
+  
+  // 加载帖子数据
   useEffect(() => {
-    async function extractPostId() {
-      try {
-        // 处理params可能是Promise的情况
-        const paramsObj = props.params instanceof Promise 
-          ? await props.params 
-          : props.params;
-        
-        // 确保从params中提取id
-        if (typeof paramsObj === 'object' && paramsObj !== null && 'id' in paramsObj) {
-          const id = String(paramsObj.id);
-          console.log("[EditPost] 提取到帖子ID:", id);
-          setPostId(id);
-        } else {
-          console.error("[EditPost] 无法从params中获取帖子ID:", paramsObj);
-          toast({
-            title: "参数错误",
-            description: "无法获取帖子ID，请返回列表重试",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("[EditPost] 提取帖子ID时出错:", error);
-      }
-    }
-    
-    extractPostId();
-  }, [props.params, toast]);
-  
-  // 检查权限 - 允许超级管理员编辑
-  useEffect(() => {
-    const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
-    const isAdminByEmail = adminEmails.includes(session?.user?.email || "");
-    
-    // 打印用户权限
-    console.log("[EditPost] 权限检查:", {
-      isAdmin: isAdmin(),
-      hasEditPermission: hasPermission(AdminPermission.ADMIN_ACCESS),
-      userEmail: session?.user?.email,
-      adminEmailsConfig: process.env.NEXT_PUBLIC_ADMIN_EMAILS,
-      isAdminByEmail
-    });
-    
-    // 如果权限仍在加载中，等待加载完成
-    if (status === "loading") {
-      console.log("[EditPost] 权限加载中，等待...");
-      return;
-    }
-    
-    // 超级管理员邮箱直接允许访问
-    if (isAdminByEmail) {
-      console.log("[EditPost] 用户邮箱匹配超级管理员邮箱列表，允许访问");
-      return; // 有权限，直接返回
-    }
-    
-    // 如果是管理员或有编辑权限，则允许访问
-    if (isAdmin() || hasPermission(AdminPermission.ADMIN_ACCESS)) {
-      console.log("[EditPost] 用户有权限编辑帖子");
-      return; // 有权限，直接返回
-    }
-    
-    // 否则显示错误并重定向
-    console.log("[EditPost] 用户无权编辑帖子，重定向");
-    toast({
-      title: "无权访问",
-      description: "您没有编辑帖子的权限",
-      variant: "destructive",
-    });
-    router.push("/admin/posts");
-  }, [hasPermission, isAdmin, router, toast, session, status]);
-  
-  // 获取帖子数据
-  useEffect(() => {
-    if (!postId) return;
-    
     async function fetchPost() {
+      if (!id) return;
+      
       try {
-        setLoading(true);
-        const res = await fetch(`/api/posts/${postId}`);
-        if (!res.ok) {
-          throw new Error(`获取帖子失败: ${res.status}`);
-        }
-        const data = await res.json();
-        setPost(data);
-        setTitle(data.title);
-        setContent(data.content);
-        setStatus(data.status);
-        setTags(data.postTags.map((pt: PostTag) => pt.tag.name));
-        console.log("[EditPost] 获取到帖子数据:", data);
-      } catch (error) {
-        console.error("[EditPost] 获取帖子数据失败:", error);
-        toast({
-          title: "获取失败",
-          description: "无法获取帖子数据，请重试",
-          variant: "destructive",
+        setIsLoading(true);
+        const response = await fetch(`/api/posts/${id}`, {
+          headers: {
+            "X-Admin-Request": "true"
+          }
         });
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    // 获取所有标签
-    async function fetchTags() {
-      try {
-        const response = await fetch("/api/tags");
         
         if (!response.ok) {
-          throw new Error("获取标签失败");
+          throw new Error("获取帖子失败");
         }
         
-        const data = await response.json();
-        setAllTags(data);
+        const postData = await response.json();
+        setPost(postData);
+        setEditTitle(postData.title);
+        
+        // 设置标签
+        if (postData.postTags && postData.postTags.length > 0) {
+          const tags = postData.postTags.map((pt: { tag: Tag }) => pt.tag);
+          setSelectedTags(tags);
+        }
       } catch (error) {
-        console.error("获取标签数据失败:", error);
+        console.error("获取帖子数据失败:", error);
+        toast({
+          title: "错误",
+          description: "无法加载帖子数据，请稍后再试",
+          variant: "destructive"
+        });
+        router.push("/admin/posts");
+      } finally {
+        setIsLoading(false);
       }
     }
     
     fetchPost();
+  }, [id, toast, router]);
+  
+  // 获取所有标签
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        const response = await fetch('/api/tags');
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableTags(data);
+        }
+      } catch (error) {
+        console.error('获取标签失败:', error);
+      }
+    }
+    
     fetchTags();
-  }, [postId, toast]);
+  }, []);
   
-  // 更新表单字段
-  const updateFormField = (field: string, value: string | string[]) => {
-    if (field === "title") {
-      setTitle(value as string);
-    } else if (field === "content") {
-      setContent(value as string);
-    } else if (field === "status") {
-      setStatus(value as string);
-    } else if (field === "tags") {
-      setTags(value as string[]);
+  // 处理标签选择
+  const handleTagSelect = (tag: Tag) => {
+    if (!selectedTags.some(t => t.id === tag.id)) {
+      setSelectedTags([...selectedTags, tag]);
+    } else {
+      setSelectedTags(selectedTags.filter(t => t.id !== tag.id));
     }
-  };
-  
-  // 添加标签
-  const addTag = () => {
-    if (!tagInput.trim()) return;
-    
-    // 如果标签已存在，则不重复添加
-    if (tags.includes(tagInput.trim())) {
-      setTagInput("");
-      return;
-    }
-    
-    setTags([...tags, tagInput.trim()]);
-    setTagInput("");
   };
   
   // 移除标签
-  const removeTag = (tag: string) => {
-    setTags(tags.filter(t => t !== tag));
-  };
-  
-  // 选择已有标签
-  const selectExistingTag = (tagName: string) => {
-    if (tags.includes(tagName)) return;
-    
-    setTags([...tags, tagName]);
+  const handleTagRemove = (tagId: string) => {
+    setSelectedTags(selectedTags.filter(t => t.id !== tagId));
   };
   
   // 保存帖子
-  const handleSavePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!postId) {
-      console.error("[EditPost] 保存失败: 缺少帖子ID");
-      toast({
-        title: "保存失败",
-        description: "无法确定帖子ID",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // 表单验证
-    if (!title.trim() || !content.trim() || !status) {
-      toast({
-        title: "表单不完整",
-        description: "请填写所有必填字段",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  async function handleSavePost() {
+    if (!post || !editorRef.current) return;
+    
     try {
-      setLoading(true);
+      setIsSaving(true);
+      const content = editorRef.current.getValue();
       
-      // 为超级管理员添加自定义请求头
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-      
-      // 检查是否为超级管理员
-      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',') || [];
-      const isAdminByEmail = adminEmails.includes(session?.user?.email || "");
-      
-      if (isAdminByEmail) {
-        console.log("[EditPost] 使用超级管理员权限提交");
-        // 使用类型断言处理自定义请求头
-        (headers as Record<string, string>)["X-Admin-Override"] = "true";
-      }
-
-      const res = await fetch(`/api/posts/${postId}`, {
+      const response = await fetch(`/api/posts/${post.id}`, {
         method: "PUT",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "true"
+        },
         body: JSON.stringify({
-          title,
-          content,
-          status,
-          tags,
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(
-          `保存失败 (${res.status}): ${errorData.error || res.statusText || "未知错误"}`
-        );
-      }
-
-      toast({
-        title: "保存成功",
-        description: "帖子已更新",
+          title: editTitle,
+          content: content,
+          tags: selectedTags.map(tag => tag.name),
+          status: post.status // 保持原状态不变
+        })
       });
       
-      // 更新成功后返回列表页
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "保存帖子失败");
+      }
+      
+      toast({
+        title: "成功",
+        description: "帖子已更新"
+      });
+      
+      // 返回列表页面
       router.push("/admin/posts");
     } catch (error) {
-      console.error("[EditPost] 保存帖子时出错:", error);
+      console.error("保存帖子失败:", error);
       toast({
-        title: "保存失败",
-        description: error instanceof Error ? error.message : "未知错误",
-        variant: "destructive",
+        title: "错误",
+        description: error instanceof Error ? error.message : "保存失败，请稍后再试",
+        variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
-  };
+  }
   
-  // 加载状态
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-          <p className="mt-2">加载中...</p>
+          <p className="mt-2 text-sm text-muted-foreground">加载中...</p>
         </div>
       </div>
     );
   }
   
-  // 帖子不存在
   if (!post) {
     return (
-      <div className="text-center py-16">
-        <h3 className="text-lg font-medium">未找到帖子</h3>
-        <p className="mt-2 text-muted-foreground">
-          该帖子可能已被删除或不存在
-        </p>
-        <Button className="mt-4" onClick={() => router.push("/admin/posts")}>
-          返回帖子列表
-        </Button>
+      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+        <div className="text-center">
+          <p className="text-lg font-medium">未找到帖子</p>
+          <Button 
+            className="mt-4" 
+            variant="outline" 
+            onClick={() => router.push("/admin/posts")}
+          >
+            返回列表
+          </Button>
+        </div>
       </div>
     );
   }
   
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">编辑帖子</h1>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/admin/posts")}>
-            取消
-          </Button>
-          <Button onClick={handleSavePost} disabled={loading}>
-            {loading ? "保存中..." : "保存帖子"}
-          </Button>
-        </div>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>帖子信息</CardTitle>
-          <CardDescription>
-            编辑帖子内容和设置
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="title">帖子标题</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => updateFormField("title", e.target.value)}
-              placeholder="输入帖子标题"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="content">帖子内容</Label>
-            <Textarea
-              id="content"
-              rows={15}
-              value={content}
-              onChange={(e) => updateFormField("content", e.target.value)}
-              placeholder="输入帖子内容"
-              className="min-h-[200px] resize-y"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="status">帖子状态</Label>
-            <Select
-              value={status}
-              onValueChange={(value) => updateFormField("status", value)}
+      <Card className="w-full h-[calc(100vh-120px)] flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between py-2 px-4 flex-shrink-0 border-b">
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="mr-2 h-8 w-8"
+              onClick={() => router.push("/admin/posts")}
             >
-              <SelectTrigger id="status">
-                <SelectValue placeholder="选择状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="published">已发布</SelectItem>
-                <SelectItem value="draft">草稿</SelectItem>
-                <SelectItem value="archived">已归档</SelectItem>
-              </SelectContent>
-            </Select>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">返回</span>
+            </Button>
+            <CardTitle className="text-lg sr-only">编辑帖子</CardTitle>
           </div>
-          
-          <div className="space-y-4">
-            <Label>标签</Label>
-            
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 my-2">
-                {tags.map((tag, index) => (
-                  <div
-                    key={index}
-                    className="bg-secondary text-secondary-foreground rounded-full px-3 py-1 text-sm flex items-center"
-                  >
-                    {tag}
-                    <button
-                      onClick={() => removeTag(tag)}
-                      className="ml-2 text-secondary-foreground/70 hover:text-secondary-foreground"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
+          <Button 
+            onClick={handleSavePost}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                保存中
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                保存
+              </>
             )}
-            
-            <div className="flex gap-2">
+          </Button>
+        </CardHeader>
+        
+        <CardContent className="pt-6 overflow-y-auto flex-grow">
+          <div className="space-y-8 pb-10">
+            {/* 标题输入 */}
+            <div className="space-y-2">
               <Input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                placeholder="添加标签"
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                id="post-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="帖子标题"
+                className="text-lg py-6"
               />
-              <Button type="button" onClick={addTag}>
-                添加
-              </Button>
             </div>
             
-            {allTags.length > 0 && (
-              <div className="mt-4">
-                <Label className="mb-2 block">选择已有标签:</Label>
-                <div className="flex flex-wrap gap-2">
-                  {allTags
-                    .filter(tag => !tags.includes(tag.name))
-                    .map(tag => (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => selectExistingTag(tag.name)}
-                        className="bg-muted hover:bg-muted/80 rounded-full px-3 py-1 text-sm"
+            {/* 标签选择 */}
+            <div className="space-y-2">
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        role="combobox"
+                        aria-expanded={tagPopoverOpen}
+                        className="h-8 w-8"
+                        onClick={() => setTagPopoverOpen(true)}
                       >
-                        {tag.name}
-                      </button>
-                    ))}
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command className="w-full">
+                        <CommandInput 
+                          placeholder="搜索标签..." 
+                          className="h-9 border-none focus:ring-0"
+                          value={tagSearchQuery}
+                          onValueChange={setTagSearchQuery}
+                        />
+                        <CommandEmpty className="py-6 text-center text-sm">
+                          未找到相关标签
+                        </CommandEmpty>
+                        <ScrollArea className="h-[200px]">
+                          <CommandGroup>
+                            {filteredTags.map((tag) => {
+                              const isSelected = selectedTags.some(t => t.id === tag.id);
+                              return (
+                                <CommandItem
+                                  key={tag.id}
+                                  value={tag.name}
+                                  onSelect={() => handleTagSelect(tag)}
+                                  className={cn(
+                                    "flex items-center gap-2 px-2 py-1.5",
+                                    isSelected && "bg-primary/5"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                    isSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                                  )}>
+                                    {isSelected && (
+                                      <Check className="h-3 w-3" />
+                                    )}
+                                  </div>
+                                  <span className={cn(
+                                    "flex-1",
+                                    isSelected && "font-medium"
+                                  )}>
+                                    {tag.name}
+                                  </span>
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </ScrollArea>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <div className="flex-1 flex flex-wrap gap-1.5 min-h-[2.5rem] py-1">
+                    {selectedTags.length === 0 ? (
+                      <span className="text-muted-foreground text-sm py-1">
+                        请选择标签...
+                      </span>
+                    ) : (
+                      selectedTags.map((tag) => (
+                        <Badge
+                          key={tag.id}
+                          variant="secondary"
+                          className="flex items-center gap-1 px-2 py-1 text-sm bg-primary/10 hover:bg-primary/20 transition-colors border-none"
+                        >
+                          {tag.name}
+                          <button
+                            type="button"
+                            onClick={() => handleTagRemove(tag.id)}
+                            className="ml-1 rounded-full hover:bg-primary/20 p-0.5 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
+            
+            {/* 内容编辑器 */}
+            <div className="space-y-2">
+              <div className="border rounded-md">
+                <VditorEditor
+                  ref={editorRef}
+                  initialValue={post.content}
+                  height={480}
+                  postId={post.id}
+                />
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

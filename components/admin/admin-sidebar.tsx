@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -32,24 +32,9 @@ interface SidebarItemProps {
   label: string;
   href: string;
   isActive?: boolean;
-  permission?: AdminPermission | AdminPermission[];
 }
 
-function SidebarItem({ icon, label, href, isActive, permission }: SidebarItemProps) {
-  const { hasAdminPermission, hasAnyPermission } = useAuthPermissions();
-  
-  // 如果需要权限但用户没有，则不显示
-  let shouldRender = true;
-  if (permission) {
-    if (Array.isArray(permission)) {
-      shouldRender = hasAnyPermission(permission);
-    } else {
-      shouldRender = hasAdminPermission(permission);
-    }
-  }
-  
-  if (!shouldRender) return null;
-  
+function SidebarItem({ icon, label, href, isActive }: SidebarItemProps) {  
   return (
     <Link href={href}>
       <Button
@@ -77,61 +62,90 @@ function SidebarItem({ icon, label, href, isActive, permission }: SidebarItemPro
 export function AdminSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { hasAdminPermission } = useAuthPermissions();
+  const { hasPermission, hasAnyPermission, permissions } = useAuthPermissions();
   
   // 检查用户是否有管理员权限
-  const isAdmin = hasAdminPermission(AdminPermission.ADMIN_ACCESS);
+  const isAdmin = hasPermission(AdminPermission.ADMIN_ACCESS);
   
   // 创建一个渲染变量，而不是直接返回null
   // 这样可以保持hooks调用的一致性
   const shouldRenderSidebar = isAdmin;
   
-  // 假设这是管理菜单项的数组
+  // 定义管理菜单项的数组 - 修正路径匹配实际目录结构
   const ADMIN_MENU = [
     {
       title: "控制台",
       href: "/admin",
       icon: LayoutDashboard,
-      permission: AdminPermission.ADMIN_ACCESS,
+      permission: "admin_access", // 使用字符串表示权限
     },
     {
       title: "用户管理",
       href: "/admin/users",
       icon: Users,
-      permission: AdminPermission.VIEW_USERS,
-    },
-    {
-      title: "用户角色分配",
-      href: "/admin/assign-user-roles",
-      icon: UserCog,
-      permission: [AdminPermission.VIEW_USERS, AdminPermission.EDIT_USER],
-      requireAll: true,
+      permission: "admin_access", // 简化为只检查admin_access权限
     },
     {
       title: "用户角色",
       href: "/admin/user-roles",
       icon: UserCheck,
-      permission: AdminPermission.VIEW_ROLES,
+      permission: "admin_access", // 简化为只检查admin_access权限
     },
     {
-      title: "论坛管理",
-      href: "/admin/forum",
+      title: "帖子管理",
+      href: "/admin/posts", // 修改为实际目录名
       icon: MessageSquare,
-      permission: AdminPermission.VIEW_POSTS,
+      permission: "admin_access", // 简化为只检查admin_access权限
     },
     {
       title: "资源管理",
-      href: "/admin/resources",
-      icon: FileSymlink,
-      permission: AdminPermission.VIEW_FILES,
+      href: "/admin/file-links", // 修改为实际目录名
+      icon: FileSymlink, 
+      permission: "admin_access", // 简化为只检查admin_access权限
     },
     {
       title: "系统设置",
       href: "/admin/settings",
       icon: Settings,
-      permission: AdminPermission.VIEW_SETTINGS,
+      permission: "admin_access", // 简化为只检查admin_access权限
+    },
+    {
+      title: "标签管理", 
+      href: "/admin/tags",
+      icon: Tag,
+      permission: "admin_access", // 确保管理员可以看到
+    },
+    {
+      title: "评论管理",
+      href: "/admin/comments",
+      icon: MessageSquare,
+      permission: "admin_access", // 确保管理员可以看到
+    },
+    {
+      title: "系统日志",
+      href: "/admin/logs",
+      icon: FileBarChart,
+      permission: "admin_access", // 确保管理员可以看到
+    },
+    {
+      title: "通知管理",
+      href: "/admin/notifications",
+      icon: Bell,
+      permission: "admin_access", // 确保管理员可以看到
     },
   ];
+  
+  // 简化权限检查，使用useMemo缓存菜单项
+  const menuWithPermissionCheck = useMemo(() => {
+    // 检查用户是否有admin_access权限（管理员）
+    const isAdminUser = permissions.includes("admin_access");
+    
+    // 简化权限检查逻辑 - 只要有admin_access权限就能看到所有菜单项
+    return ADMIN_MENU.map(item => ({
+      ...item,
+      hasPermission: isAdminUser // 只要是管理员就显示所有菜单项
+    }));
+  }, [permissions]);
   
   // 渲染侧边栏内容，但根据shouldRenderSidebar决定是否显示
   return shouldRenderSidebar ? (
@@ -160,66 +174,24 @@ export function AdminSidebar() {
       <ScrollArea className="flex-1 p-3">
         {collapsed ? (
           <div className="flex flex-col items-center gap-4 py-2">
-            <Link href="/admin">
-              <Button 
-                variant={pathname === "/admin" ? "secondary" : "ghost"} 
-                size="icon"
-                className={cn(
-                  "transition-all duration-200 hover:scale-110",
-                  pathname === "/admin" ? "bg-primary/20 text-primary shadow-sm" : "hover:bg-primary/10"
-                )}
-              >
-                <LayoutDashboard size={20} />
-              </Button>
-            </Link>
-            <Link href="/admin/users">
-              <Button 
-                variant={pathname.startsWith("/admin/users") ? "secondary" : "ghost"} 
-                size="icon"
-                className={cn(
-                  "transition-all duration-200 hover:scale-110",
-                  pathname.startsWith("/admin/users") ? "bg-primary/20 text-primary shadow-sm" : "hover:bg-primary/10"
-                )}
-              >
-                <Users size={20} />
-              </Button>
-            </Link>
-            <Link href="/admin/roles">
-              <Button 
-                variant={pathname.startsWith("/admin/roles") ? "secondary" : "ghost"} 
-                size="icon"
-                className={cn(
-                  "transition-all duration-200 hover:scale-110",
-                  pathname.startsWith("/admin/roles") ? "bg-primary/20 text-primary shadow-sm" : "hover:bg-primary/10"
-                )}
-              >
-                <ShieldCheck size={20} />
-              </Button>
-            </Link>
-            <Link href="/admin/posts">
-              <Button 
-                variant={pathname.startsWith("/admin/posts") ? "secondary" : "ghost"} 
-                size="icon"
-                className={cn(
-                  "transition-all duration-200 hover:scale-110",
-                  pathname.startsWith("/admin/posts") ? "bg-primary/20 text-primary shadow-sm" : "hover:bg-primary/10"
-                )}
-              >
-                <FileText size={20} />
-              </Button>
-            </Link>
-            <Link href="/admin/file-links">
-              <Button 
-                variant={pathname.startsWith("/admin/file-links") ? "secondary" : "ghost"} 
-                size="icon"
-                className={cn(
-                  "transition-all duration-200 hover:scale-110",
-                  pathname.startsWith("/admin/file-links") ? "bg-primary/20 text-primary shadow-sm" : "hover:bg-primary/10"
-                )}
-              >
-                <LinkIcon size={20} />
-              </Button>
-            </Link>
+            {menuWithPermissionCheck
+              .filter(item => item.hasPermission)
+              .map((item, index) => (
+                <Link href={item.href} key={index}>
+                  <Button 
+                    variant={pathname.startsWith(item.href) || (item.href === '/admin' && pathname === '/admin') ? "secondary" : "ghost"} 
+                    size="icon"
+                    className={cn(
+                      "transition-all duration-200 hover:scale-110",
+                      pathname.startsWith(item.href) || (item.href === '/admin' && pathname === '/admin') 
+                        ? "bg-primary/20 text-primary shadow-sm" 
+                        : "hover:bg-primary/10"
+                    )}
+                  >
+                    {item.icon && <item.icon size={20} />}
+                  </Button>
+                </Link>
+              ))}
           </div>
         ) : (
           <div className="space-y-4">
@@ -235,27 +207,26 @@ export function AdminSidebar() {
                 <span className="mr-2 h-0.5 w-5 bg-primary/40 rounded-full"></span>
                 用户和权限
               </h4>
-              <SidebarItem
-                icon={<Users size={20} />}
-                label="用户管理"
-                href="/admin/users"
-                isActive={pathname.startsWith("/admin/users")}
-                permission={AdminPermission.VIEW_USERS}
-              />
-              <SidebarItem
-                icon={<UserCog size={20} />}
-                label="用户角色分配"
-                href="/admin/assign-user-roles"
-                isActive={pathname.startsWith("/admin/assign-user-roles")}
-                permission={[AdminPermission.VIEW_USERS, AdminPermission.EDIT_USER]}
-              />
-              <SidebarItem
-                icon={<UserCheck size={20} />}
-                label="用户角色"
-                href="/admin/user-roles"
-                isActive={pathname.startsWith("/admin/user-roles")}
-                permission={AdminPermission.VIEW_ROLES}
-              />
+              
+              {/* 用户管理项 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/users")?.hasPermission && (
+                <SidebarItem
+                  icon={<Users size={20} />}
+                  label="用户管理"
+                  href="/admin/users"
+                  isActive={pathname.startsWith("/admin/users")}
+                />
+              )}
+              
+              {/* 用户角色 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/user-roles")?.hasPermission && (
+                <SidebarItem
+                  icon={<UserCheck size={20} />}
+                  label="用户角色"
+                  href="/admin/user-roles"
+                  isActive={pathname.startsWith("/admin/user-roles")}
+                />
+              )}
             </div>
             
             <div className="pt-2">
@@ -263,69 +234,83 @@ export function AdminSidebar() {
                 <span className="mr-2 h-0.5 w-5 bg-primary/40 rounded-full"></span>
                 内容管理
               </h4>
-              <SidebarItem
-                icon={<FileText size={20} />}
-                label="帖子管理"
-                href="/admin/posts"
-                isActive={pathname.startsWith("/admin/posts")}
-                permission={AdminPermission.VIEW_POSTS}
-              />
-              <SidebarItem
-                icon={<Tag size={20} />}
-                label="标签管理"
-                href="/admin/tags"
-                isActive={pathname.startsWith("/admin/tags")}
-                permission={AdminPermission.ADMIN_ACCESS}
-              />
-              <SidebarItem
-                icon={<MessageSquare size={20} />}
-                label="评论管理"
-                href="/admin/comments"
-                isActive={pathname.startsWith("/admin/comments")}
-                permission={AdminPermission.VIEW_COMMENTS}
-              />
-              <SidebarItem
-                icon={<FolderOpen size={20} />}
-                label="文件管理"
-                href="/admin/files"
-                isActive={pathname.startsWith("/admin/files")}
-                permission={AdminPermission.VIEW_FILES}
-              />
-              <SidebarItem
-                icon={<LinkIcon size={20} />}
-                label="外部链接管理"
-                href="/admin/file-links"
-                isActive={pathname.startsWith("/admin/file-links")}
-                permission={AdminPermission.VIEW_LINKS}
-              />
+              
+              {/* 帖子管理 - 修改路径 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/posts")?.hasPermission && (
+                <SidebarItem
+                  icon={<MessageSquare size={20} />}
+                  label="帖子管理"
+                  href="/admin/posts"
+                  isActive={pathname.startsWith("/admin/posts")}
+                />
+              )}
+              
+              {/* 标签管理 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/tags")?.hasPermission && (
+                <SidebarItem
+                  icon={<Tag size={20} />}
+                  label="标签管理"
+                  href="/admin/tags"
+                  isActive={pathname.startsWith("/admin/tags")}
+                />
+              )}
+              
+              {/* 评论管理 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/comments")?.hasPermission && (
+                <SidebarItem
+                  icon={<MessageSquare size={20} />}
+                  label="评论管理"
+                  href="/admin/comments"
+                  isActive={pathname.startsWith("/admin/comments")}
+                />
+              )}
+              
+              {/* 资源管理 - 修改路径 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/file-links")?.hasPermission && (
+                <SidebarItem
+                  icon={<FileSymlink size={20} />}
+                  label="资源管理"
+                  href="/admin/file-links"
+                  isActive={pathname.startsWith("/admin/file-links")}
+                />
+              )}
             </div>
             
             <div className="pt-2">
               <h4 className="text-xs font-semibold text-primary/70 px-4 py-2 flex items-center">
                 <span className="mr-2 h-0.5 w-5 bg-primary/40 rounded-full"></span>
-                系统管理
+                系统设置
               </h4>
-              <SidebarItem
-                icon={<Bell size={20} />}
-                label="通知管理"
-                href="/admin/notifications"
-                isActive={pathname.startsWith("/admin/notifications")}
-                permission={AdminPermission.VIEW_NOTIFICATIONS}
-              />
-              <SidebarItem
-                icon={<Settings size={20} />}
-                label="系统设置"
-                href="/admin/settings"
-                isActive={pathname.startsWith("/admin/settings")}
-                permission={AdminPermission.VIEW_SETTINGS}
-              />
-              <SidebarItem
-                icon={<FileBarChart size={20} />}
-                label="操作日志"
-                href="/admin/logs"
-                isActive={pathname.startsWith("/admin/logs")}
-                permission={AdminPermission.VIEW_LOGS}
-              />
+              
+              {/* 系统设置 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/settings")?.hasPermission && (
+                <SidebarItem
+                  icon={<Settings size={20} />}
+                  label="系统设置"
+                  href="/admin/settings"
+                  isActive={pathname.startsWith("/admin/settings")}
+                />
+              )}
+              
+              {/* 系统日志 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/logs")?.hasPermission && (
+                <SidebarItem
+                  icon={<FileBarChart size={20} />}
+                  label="系统日志"
+                  href="/admin/logs"
+                  isActive={pathname.startsWith("/admin/logs")}
+                />
+              )}
+              
+              {/* 通知管理 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/notifications")?.hasPermission && (
+                <SidebarItem
+                  icon={<Bell size={20} />}
+                  label="通知管理"
+                  href="/admin/notifications"
+                  isActive={pathname.startsWith("/admin/notifications")}
+                />
+              )}
             </div>
           </div>
         )}

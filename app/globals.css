@@ -9,6 +9,14 @@ body {
 /* 管理员模式下隐藏网站导航栏 */
 body.admin-mode nav.site-navbar {
   display: none;
+  position: absolute;
+  visibility: hidden;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
 }
 
 /* 管理员模式下隐藏网站页脚 */
@@ -20,6 +28,13 @@ body.admin-mode footer.site-footer {
 body.admin-mode {
   overflow: hidden;
   height: 100vh;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* 管理员模式下移除页面内边距 */
+body.admin-mode main {
+  padding-top: 0 !important;
 }
 
 /* 管理员侧边栏动画 */

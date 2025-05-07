@@ -84,7 +84,7 @@ export default function AdminDebugPage() {
             <dd>{isLoading ? "加载中..." : "已完成"}</dd>
             
             <dt className="font-semibold">是否管理员:</dt>
-            <dd>{isAdmin ? "是" : "否"}</dd>
+            <dd>{isAdmin() ? "是" : "否"}</dd>
             
             <dt className="font-semibold">有admin_access权限:</dt>
             <dd>{hasAdminPermission(AdminPermission.ADMIN_ACCESS) ? "是" : "否"}</dd>

@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
     });
     const userPermissions = user?.userRoles.flatMap(ur => ur.role.permissions || []) || [];
 
-    // 验证是否有查看角色的权限
-    if (!userPermissions.includes(AdminPermission.VIEW_ROLES)) {
+    // 验证是否有查看角色的权限或是否为管理员
+    if (!hasPermission(userPermissions, AdminPermission.ADMIN_ACCESS)) {
       return NextResponse.json({ error: '没有查看角色的权限' }, { status: 403 });
     }
 

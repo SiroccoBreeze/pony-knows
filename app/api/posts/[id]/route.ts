@@ -109,13 +109,15 @@ export async function PATCH(
     const id = typeof paramsData.id === 'string' 
       ? paramsData.id 
       : (await paramsData.id).id;
-    const { reviewStatus } = await request.json();
+    const requestData = await request.json();
+    const { reviewStatus, content } = requestData;
 
     // 检查帖子是否存在
     const existingPost = await prisma.post.findUnique({
       where: { id },
       select: { 
         authorId: true,
+        content: true,
         reviewStatus: true 
       },
     });
@@ -148,28 +150,45 @@ export async function PATCH(
     const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
     const canEditPosts = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
 
-    // 只允许管理员或超级管理员进行审核操作
+    // 只允许管理员或超级管理员进行审核和编辑操作
     if (!canEditPosts && !isAdmin && !isSuperAdmin && !adminOverride) {
       return NextResponse.json(
-        { error: "无权审核帖子" },
+        { error: "无权操作帖子" },
         { status: 403 }
       );
     }
 
-    // 验证审核状态参数
-    if (!reviewStatus || !['approved', 'pending', 'rejected'].includes(reviewStatus)) {
+    // 准备更新数据
+    const updateData: any = {};
+    
+    // 如果请求包含审核状态，则验证并添加到更新数据中
+    if (reviewStatus) {
+      if (!['approved', 'pending', 'rejected'].includes(reviewStatus)) {
+        return NextResponse.json(
+          { error: "无效的审核状态" },
+          { status: 400 }
+        );
+      }
+      updateData.reviewStatus = reviewStatus;
+    }
+    
+    // 如果请求包含内容，则添加到更新数据中
+    if (content !== undefined) {
+      updateData.content = content;
+    }
+    
+    // 如果没有任何要更新的数据，则返回错误
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
-        { error: "无效的审核状态" },
+        { error: "未提供任何要更新的数据" },
         { status: 400 }
       );
     }
 
-    // 更新帖子审核状态
+    // 更新帖子
     const updatedPost = await prisma.post.update({
       where: { id },
-      data: {
-        reviewStatus,
-      },
+      data: updateData,
       include: {
         postTags: {
           include: {
@@ -190,25 +209,27 @@ export async function PATCH(
     await prisma.adminLog.create({
       data: {
         userId: session.user.id,
-        action: "REVIEW_POST",
+        action: content !== undefined ? "EDIT_POST_CONTENT" : "REVIEW_POST",
         resource: "POST",
         resourceId: id,
         details: { 
           previousStatus: existingPost.reviewStatus,
-          newStatus: reviewStatus 
+          newStatus: reviewStatus,
+          contentEdited: content !== undefined
         },
       },
     });
 
     return NextResponse.json({
       ...updatedPost,
-      message: `帖子已${reviewStatus === 'approved' ? '通过审核' : (reviewStatus === 'rejected' ? '被拒绝' : '设为待审核')}`
+      message: content !== undefined ? "帖子内容已更新" : 
+        `帖子已${reviewStatus === 'approved' ? '通过审核' : (reviewStatus === 'rejected' ? '被拒绝' : '设为待审核')}`
     });
   } catch (error) {
-    console.error("审核帖子失败:", error);
+    console.error("操作帖子失败:", error);
     const errorMessage = error instanceof Error ? error.message : "未知错误";
     return NextResponse.json(
-      { error: "审核帖子失败，请稍后再试", details: errorMessage },
+      { error: "操作帖子失败，请稍后再试", details: errorMessage },
       { status: 500 }
     );
   }

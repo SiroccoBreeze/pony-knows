@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -42,11 +43,12 @@ import {
   Trash, 
   Filter,
   CheckCircle2,
-  XCircle
+  XCircle,
 } from "lucide-react";
-import { AdminPermission, UserPermission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
+import Link from "next/link";
 
 interface Post {
   id: string;
@@ -55,18 +57,14 @@ interface Post {
   createdAt: string;
   status: string;
   reviewStatus: string;
-  views: number;
   author: {
+    id: string;
     name: string;
-    email: string;
   };
-  postTags: {
-    tag: {
-      name: string;
-    }
-  }[];
-  _count: {
-    comments: number;
+  postTags?: { tag: { id: string; name: string } }[];
+  views?: number;  // 浏览量
+  _count?: {
+    comments: number;  // 评论量
   };
 }
 
@@ -75,19 +73,31 @@ interface Tag {
   name: string;
 }
 
+// 创建VisuallyHidden组件
+const VisuallyHidden = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <span className="sr-only">
+      {children}
+    </span>
+  );
+};
+
 export default function PostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [reviewStatusFilter, setReviewStatusFilter] = useState("all");
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  // 添加拒绝审核功能所需状态
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [rejectingPost, setRejectingPost] = useState<Post | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   
   const { hasPermission } = useAuthPermissions();
   const { toast } = useToast();
@@ -95,23 +105,7 @@ export default function PostsPage() {
   // 获取帖子数据
   useEffect(() => {
     fetchPosts();
-  }, [page, searchQuery, selectedTags, statusFilter, reviewStatusFilter]);
-  
-  // 获取标签数据
-  useEffect(() => {
-    async function fetchTags() {
-      try {
-        const response = await fetch("/api/tags");
-        if (!response.ok) throw new Error("获取标签失败");
-        const data = await response.json();
-        setTags(data);
-      } catch (error) {
-        console.error("获取标签数据失败:", error);
-      }
-    }
-    
-    fetchTags();
-  }, []);
+  }, [page, searchQuery, statusFilter, reviewStatusFilter]);
   
   async function fetchPosts() {
     try {
@@ -130,9 +124,11 @@ export default function PostsPage() {
         url += `&reviewStatus=${reviewStatusFilter}`;
       }
       
-      if (selectedTags.length > 0) {
-        url += `&tags=${selectedTags.join(",")}`;
-      }
+      // 添加包含标签信息的参数
+      url += "&includeTags=true";
+      
+      // 添加包含统计信息的参数
+      url += "&includeStats=true";
       
       const response = await fetch(url, {
         headers: {
@@ -143,6 +139,7 @@ export default function PostsPage() {
       if (!response.ok) throw new Error("获取帖子列表失败");
       
       const data = await response.json();
+      console.log("获取到的帖子数据:", data.posts[0]);
       setPosts(data.posts);
       setTotal(data.total);
     } catch (error) {
@@ -177,23 +174,12 @@ export default function PostsPage() {
     }
   }
   
-  // 切换标签筛选
-  function toggleTagFilter(tagName: string) {
-    setSelectedTags(prev => {
-      if (prev.includes(tagName)) {
-        return prev.filter(t => t !== tagName);
-      } else {
-        return [...prev, tagName];
-      }
-    });
-  }
-  
   // 批量删除帖子
   async function handleBatchDelete() {
     if (selectedPosts.length === 0) return;
     
     try {
-      // 逐个调用删除API，因为似乎没有批量删除的API端点
+      // 逐个调用删除API，因为没有批量删除的API端点
       const deletePromises = selectedPosts.map(id => 
         fetch(`/api/posts/${id}`, {
           method: "DELETE"
@@ -262,11 +248,9 @@ export default function PostsPage() {
     }
   }
   
-  // 审核帖子
-  async function handleReviewPost(postId: string, action: 'approve' | 'reject') {
+  // 审核通过帖子
+  async function handleApprovePost(postId: string) {
     try {
-      const reviewStatus = action === 'approve' ? 'approved' : 'rejected';
-      
       const response = await fetch(`/api/posts/${postId}`, {
         method: "PATCH",
         headers: {
@@ -274,7 +258,7 @@ export default function PostsPage() {
           "X-Admin-Override": "true"
         },
         body: JSON.stringify({
-          reviewStatus
+          reviewStatus: 'approved'
         })
       });
       
@@ -285,7 +269,7 @@ export default function PostsPage() {
       
       toast({
         title: "成功",
-        description: action === 'approve' ? "帖子已通过审核" : "帖子已被拒绝"
+        description: "帖子已通过审核"
       });
       
       // 刷新数据
@@ -300,6 +284,74 @@ export default function PostsPage() {
     }
   }
   
+  // 打开拒绝审核对话框
+  function openRejectDialog(post: Post) {
+    setRejectingPost(post);
+    setRejectReason("");
+    setIsRejectDialogOpen(true);
+  }
+  
+  // 拒绝帖子并发送通知
+  async function handleRejectPost() {
+    if (!rejectingPost) return;
+    
+    try {
+      // 更新帖子状态为拒绝
+      const updateResponse = await fetch(`/api/posts/${rejectingPost.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Override": "true"
+        },
+        body: JSON.stringify({
+          reviewStatus: 'rejected'
+        })
+      });
+      
+      if (!updateResponse.ok) {
+        throw new Error("更新帖子状态失败");
+      }
+      
+      // 创建系统通知
+      const notificationResponse = await fetch(`/api/notifications`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          userId: rejectingPost.author.id,
+          type: "POST_REJECTED",
+          title: "帖子审核未通过",
+          content: `您的帖子"${rejectingPost.title}"未通过审核。原因: ${rejectReason || "不符合社区规范"}`,
+          relatedId: rejectingPost.id,
+          relatedType: "post"
+        })
+      });
+      
+      if (!notificationResponse.ok) {
+        console.error("发送通知失败");
+      }
+      
+      toast({
+        title: "操作成功",
+        description: "帖子已被拒绝，并已通知作者"
+      });
+      
+      // 关闭对话框并刷新数据
+      setIsRejectDialogOpen(false);
+      setRejectingPost(null);
+      setRejectReason("");
+      fetchPosts();
+    } catch (error) {
+      console.error("拒绝帖子失败:", error);
+      toast({
+        title: "错误",
+        description: "操作失败，请稍后再试",
+        variant: "destructive"
+      });
+    }
+  }
+  
   // 格式化显示时间
   function formatDate(dateString: string) {
     return new Date(dateString).toLocaleDateString("zh-CN", {
@@ -309,45 +361,9 @@ export default function PostsPage() {
     });
   }
   
-  // 根据状态获取标签样式
-  function getStatusBadge(status: string) {
-    switch(status) {
-      case "published":
-        return <Badge variant="default">已发布</Badge>;
-      case "draft":
-        return <Badge variant="secondary">草稿</Badge>;
-      case "archived":
-        return <Badge variant="outline">已归档</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  }
-  
-  // 获取审核状态标签
-  function getReviewStatusBadge(status: string) {
-    switch(status) {
-      case "approved":
-        return <Badge variant="default" className="bg-green-600">已审核</Badge>;
-      case "pending":
-        return <Badge variant="secondary" className="bg-amber-500 text-white">待审核</Badge>;
-      case "rejected":
-        return <Badge variant="destructive">已拒绝</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  }
-  
-  // 截断内容
-  function truncateContent(content: string, maxLength = 100) {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + "...";
-  }
-  
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">帖子管理</h1>
-        
         {selectedPosts.length > 0 && hasPermission(AdminPermission.ADMIN_ACCESS) && (
           <Button 
             variant="destructive" 
@@ -370,23 +386,12 @@ export default function PostsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="搜索帖子标题或内容..."
+                  placeholder="搜索帖子标题..."
                 className="pl-8"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="帖子状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="published">已发布</SelectItem>
-                <SelectItem value="draft">草稿</SelectItem>
-                <SelectItem value="archived">已归档</SelectItem>
-              </SelectContent>
-            </Select>
+            </div>            
             <Select value={reviewStatusFilter} onValueChange={setReviewStatusFilter}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="审核状态" />
@@ -398,29 +403,6 @@ export default function PostsPage() {
                 <SelectItem value="rejected">已拒绝</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" className="w-[130px]" onClick={() => {
-              setSelectedTags([]);
-              setStatusFilter("all");
-              setReviewStatusFilter("all");
-              setSearchQuery("");
-            }}>
-              <Filter className="mr-2 h-4 w-4" />
-              重置筛选
-            </Button>
-          </div>
-          
-          {/* 标签筛选 */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {tags.slice(0, 10).map((tag) => (
-              <Badge
-                key={tag.id}
-                variant={selectedTags.includes(tag.name) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTagFilter(tag.name)}
-              >
-                {tag.name}
-              </Badge>
-            ))}
           </div>
           
           {isLoading ? (
@@ -440,21 +422,19 @@ export default function PostsPage() {
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
-                      <TableHead>标题 / 内容</TableHead>
+                      <TableHead>标题</TableHead>
                       <TableHead>作者</TableHead>
-                      <TableHead>标签</TableHead>
-                      <TableHead>状态</TableHead>
                       <TableHead>审核状态</TableHead>
-                      <TableHead>评论</TableHead>
-                      <TableHead>浏览量</TableHead>
                       <TableHead>发布时间</TableHead>
+                      <TableHead>浏览量</TableHead>
+                      <TableHead>评论量</TableHead>
                       <TableHead className="text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {posts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center h-24">
+                        <TableCell colSpan={8} className="text-center h-24">
                           没有找到符合条件的帖子
                         </TableCell>
                       </TableRow>
@@ -468,36 +448,23 @@ export default function PostsPage() {
                             />
                           </TableCell>
                           <TableCell className="font-medium">
-                            <div className="flex flex-col">
-                              <span>{post.title}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {truncateContent(post.content)}
-                              </span>
-                            </div>
+                            {post.title}
                           </TableCell>
                           <TableCell>{post.author.name}</TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {post.postTags.length > 0 ? (
-                                post.postTags.map((pt, i) => (
-                                  <Badge key={i} variant="outline" className="text-xs">
-                                    {pt.tag.name}
-                                  </Badge>
-                                ))
-                              ) : (
-                                <span className="text-xs text-muted-foreground">无标签</span>
-                              )}
-                            </div>
+                            {post.reviewStatus === "approved" && (
+                              <Badge variant="default" className="bg-green-600">已审核</Badge>
+                            )}
+                            {post.reviewStatus === "pending" && (
+                              <Badge variant="secondary" className="bg-amber-500 text-white">待审核</Badge>
+                            )}
+                            {post.reviewStatus === "rejected" && (
+                              <Badge variant="destructive">已拒绝</Badge>
+                            )}
                           </TableCell>
-                          <TableCell>
-                            {getStatusBadge(post.status)}
-                          </TableCell>
-                          <TableCell>
-                            {getReviewStatusBadge(post.reviewStatus || "approved")}
-                          </TableCell>
-                          <TableCell>{post._count?.comments || 0}</TableCell>
-                          <TableCell>{post.views || 0}</TableCell>
                           <TableCell>{formatDate(post.createdAt)}</TableCell>
+                          <TableCell>{post.views || 0}</TableCell>
+                          <TableCell>{post._count?.comments || 0}</TableCell>
                           <TableCell>
                             <div className="flex justify-end gap-2">
                               {post.reviewStatus === "pending" && (
@@ -505,7 +472,7 @@ export default function PostsPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleReviewPost(post.id, 'approve')}
+                                    onClick={() => handleApprovePost(post.id)}
                                     className="h-8 w-8 p-0 text-green-600"
                                     title="通过审核"
                                   >
@@ -515,7 +482,7 @@ export default function PostsPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => handleReviewPost(post.id, 'reject')}
+                                    onClick={() => openRejectDialog(post)}
                                     className="h-8 w-8 p-0 text-red-600"
                                     title="拒绝发布"
                                   >
@@ -536,32 +503,28 @@ export default function PostsPage() {
                                   <span className="sr-only">查看</span>
                                 </a>
                               </Button>
-                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  asChild
-                                  className="h-8 w-8 p-0"
-                                  title="编辑帖子"
-                                >
-                                  <a href={`/admin/posts/edit/${post.id}`}>
-                                    <FileEdit className="h-4 w-4" />
-                                    <span className="sr-only">编辑</span>
-                                  </a>
-                                </Button>
-                              )}
-                              {hasPermission(AdminPermission.ADMIN_ACCESS) && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeletePost(post.id)}
-                                  className="h-8 w-8 p-0"
-                                  title="删除帖子"
-                                >
-                                  <Trash className="h-4 w-4" />
-                                  <span className="sr-only">删除</span>
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="h-8 w-8 p-0"
+                                title="编辑帖子"
+                              >
+                                <Link href={`/admin/posts/edit/${post.id}`}>
+                                  <FileEdit className="h-4 w-4" />
+                                  <span className="sr-only">编辑</span>
+                                </Link>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeletePost(post.id)}
+                                className="h-8 w-8 p-0"
+                                title="删除帖子"
+                              >
+                                <Trash className="h-4 w-4" />
+                                <span className="sr-only">删除</span>
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -599,7 +562,6 @@ export default function PostsPage() {
         </CardContent>
       </Card>
       
-      {/* 删除确认对话框 */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -620,6 +582,44 @@ export default function PostsPage() {
               onClick={handleBatchDelete}
             >
               确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>拒绝审核</DialogTitle>
+            <DialogDescription>
+              请输入拒绝帖子的原因，系统将通知作者
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 mt-4">
+            <div>
+              <p className="mb-2 text-sm font-medium">拒绝原因</p>
+              <Textarea
+                placeholder="请输入拒绝原因，如：内容不符合社区规范..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsRejectDialogOpen(false)}
+            >
+              取消
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleRejectPost}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              拒绝审核
             </Button>
           </DialogFooter>
         </DialogContent>

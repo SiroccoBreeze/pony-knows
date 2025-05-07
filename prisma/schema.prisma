@@ -24,6 +24,7 @@ model User {
   posts         Post[]
   comments      Comment[]
   messages      Message[] // 用户接收的消息
+  notifications Notification[] // 用户通知
   accounts      Account[]
   sessions      Session[]
   userRoles     UserRole[] // 用户角色关联
@@ -223,4 +224,22 @@ model ExternalLink {
   isActive    Boolean  @default(true) // 链接是否激活
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// 通知表
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // 通知类型：POST_APPROVED, POST_REJECTED, COMMENT_NEW, SYSTEM 等
+  title       String   // 通知标题
+  content     String   // 通知内容
+  read        Boolean  @default(false) // 是否已读
+  relatedId   String?  // 关联ID（如帖子ID、评论ID等）
+  relatedType String?  // 关联类型（post, comment等）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([read])
 }
