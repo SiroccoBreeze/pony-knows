@@ -408,7 +408,9 @@ export default function PostDetailPage() {
       <div className="container mx-auto py-8 px-4">
         <Toaster position="top-center" />
         <div className="text-center py-12">
-          <h1 className="text-2xl font-bold mb-4">加载失败</h1>
+          <h1 className="text-2xl font-bold mb-4">
+            {error && error.includes("无权查看") ? "访问受限" : "加载失败"}
+          </h1>
           <p className="text-muted-foreground mb-4">{error || "找不到帖子"}</p>
           <div className="flex flex-col md:flex-row gap-4 justify-center">
             <Button asChild>

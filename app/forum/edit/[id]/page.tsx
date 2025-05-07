@@ -13,8 +13,6 @@ import {
   Card,
   CardContent,
   CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Form,
@@ -93,6 +91,8 @@ export default function PostEditPage({ params }: PostEditPageProps) {
   const [open, setOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [isMobile, setIsMobile] = useState(false);
+  const [hasEditPermission, setHasEditPermission] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMobile(isMobileDevice());
@@ -102,6 +102,24 @@ export default function PostEditPage({ params }: PostEditPageProps) {
   React.useEffect(() => {
     const fetchPost = async () => {
       try {
+        // 首先检查当前用户是否有编辑权限
+        const authCheckResponse = await fetch(`/api/posts/${id}/auth-check`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Action-Type': 'edit'
+          }
+        });
+
+        if (!authCheckResponse.ok) {
+          const errorData = await authCheckResponse.json();
+          setPermissionError(errorData.error || "您没有权限编辑此帖子");
+          setHasEditPermission(false);
+          setIsLoadingPost(false);
+          return;
+        }
+
+        // 用户有权限，继续获取帖子数据
         const response = await fetch(`/api/posts/${id}`);
         if (!response.ok) {
           throw new Error("获取帖子失败");
@@ -113,6 +131,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
           tags: data.postTags ? data.postTags.map((pt: PostTag) => pt.tag) : []
         };
         setPost(formattedData);
+        setHasEditPermission(true);
       } catch (error) {
         console.error("获取帖子出错:", error);
         toast({
@@ -434,6 +453,27 @@ export default function PostEditPage({ params }: PostEditPageProps) {
         <div className="text-center py-12">
           <h1 className="text-2xl font-bold mb-4">加载中...</h1>
           <p className="text-muted-foreground">正在获取帖子数据</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // 显示权限错误
+  if (permissionError) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="text-center py-12">
+          <h1 className="text-2xl font-bold mb-4">权限错误</h1>
+          <p className="text-muted-foreground mb-6">{permissionError}</p>
+          <Button onClick={() => router.back()} className="mr-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            返回
+          </Button>
+          <Button asChild>
+            <Link href={`/forum/post/${id}`}>
+              查看帖子
+            </Link>
+          </Button>
         </div>
       </div>
     );

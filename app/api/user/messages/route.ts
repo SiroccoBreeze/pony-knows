@@ -219,6 +219,66 @@ export async function PATCH(request: Request) {
   }
 }
 
+// 创建消息
+export async function POST(request: Request) {
+  try {
+    // 获取用户会话
+    const session = await getServerSession(authOptions) as ExtendedSession;
+    
+    // 检查是否是管理员操作
+    const isAdminRequest = request.headers.get("X-Admin-Request") === "true";
+    
+    if (!session?.user?.id && !isAdminRequest) {
+      return NextResponse.json(
+        { error: "未授权" },
+        { status: 401 }
+      );
+    }
+    
+    const body = await request.json();
+    const { userId, type, title, content, postId, sender } = body;
+    
+    if (!userId || !type || !title || !content) {
+      return NextResponse.json(
+        { error: "缺少必要参数" },
+        { status: 400 }
+      );
+    }
+    
+    // 创建消息
+    const message = await prisma.message.create({
+      data: {
+        userId,
+        type,
+        title,
+        content,
+        postId,
+        sender: sender || (session?.user?.name || "系统"),
+        read: false,
+      }
+    });
+    
+    // 更新本地存储以触发客户端更新
+    const timestamp = new Date().getTime().toString();
+    
+    return NextResponse.json({
+      success: true,
+      message: "消息已创建",
+      data: message,
+      timestamp
+    }, { status: 201 });
+  } catch (error) {
+    console.error("创建消息失败:", error);
+    const errorMessage = error instanceof Error ? error.message : "未知错误";
+    return NextResponse.json(
+      { error: "创建消息失败", details: errorMessage },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
 // 删除消息
 export async function DELETE(request: Request) {
   try {

@@ -11,18 +11,13 @@ import { AdminPermission } from "@/lib/permissions";
 import {
   LayoutDashboard,
   Users,
-  ShieldCheck,
-  FileText,
   MessageSquare,
-  FolderOpen,
   Bell,
   Settings,
   FileBarChart,
   Menu,
   ChevronLeft,
   Tag,
-  Link as LinkIcon,
-  UserCog,
   UserCheck,
   FileSymlink,
 } from "lucide-react";
@@ -62,7 +57,7 @@ function SidebarItem({ icon, label, href, isActive }: SidebarItemProps) {
 export function AdminSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { hasPermission, hasAnyPermission, permissions } = useAuthPermissions();
+  const { hasPermission, permissions } = useAuthPermissions();
   
   // 检查用户是否有管理员权限
   const isAdmin = hasPermission(AdminPermission.ADMIN_ACCESS);
@@ -288,7 +283,17 @@ export function AdminSidebar() {
                   icon={<Settings size={20} />}
                   label="系统设置"
                   href="/admin/settings"
-                  isActive={pathname.startsWith("/admin/settings")}
+                  isActive={pathname === "/admin/settings"}
+                />
+              )}
+              
+              {/* 参数配置 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/settings")?.hasPermission && (
+                <SidebarItem
+                  icon={<Settings size={20} />}
+                  label="参数配置"
+                  href="/admin/settings/parameters"
+                  isActive={pathname === "/admin/settings/parameters"}
                 />
               )}
               

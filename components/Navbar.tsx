@@ -31,10 +31,34 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true); // 默认为启用
   
   // 确保组件只在客户端渲染后显示
   useEffect(() => {
     setMounted(true);
+    
+    // 检查注册功能是否启用
+    const checkRegistrationEnabled = async () => {
+      try {
+        const response = await fetch("/api/system-parameters", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ key: "enable_registration" }),
+          cache: "no-store"
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setRegistrationEnabled(data.value === "true");
+        }
+      } catch (error) {
+        console.error("检查注册功能状态失败:", error);
+      }
+    };
+    
+    checkRegistrationEnabled();
   }, []);
   
   // 获取未读消息数
@@ -189,9 +213,11 @@ const Navbar = () => {
                 <Button variant="outline" asChild className="rounded-full border-primary/20 hover:bg-primary/5 transition-colors">
                   <Link href="/auth/login">登录</Link>
                 </Button>
-                <Button asChild className="rounded-full transition-transform hover:scale-105">
-                  <Link href="/auth/register">注册</Link>
-                </Button>
+                {registrationEnabled && (
+                  <Button asChild className="rounded-full transition-transform hover:scale-105">
+                    <Link href="/auth/register">注册</Link>
+                  </Button>
+                )}
               </>
             )}
           </div>

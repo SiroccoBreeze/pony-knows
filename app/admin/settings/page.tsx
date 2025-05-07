@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
 import { AdminPermission } from "@/lib/permissions";
 import { RestrictedRoute } from "@/components/restricted-route";
@@ -28,9 +28,6 @@ import { RestrictedRoute } from "@/components/restricted-route";
 interface SiteSettings {
   siteName: string;
   siteDescription: string;
-  registrationEnabled: boolean;
-  commentsEnabled: boolean;
-  maintenanceMode: boolean;
   postsPerPage: number;
   defaultUserRole: string;
   contactEmail: string;
@@ -50,9 +47,6 @@ export default function SettingsPage() {
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     siteName: "PonyKnows",
     siteDescription: "知识分享平台",
-    registrationEnabled: true,
-    commentsEnabled: true,
-    maintenanceMode: false,
     postsPerPage: 10,
     defaultUserRole: "user",
     contactEmail: "admin@example.com",
@@ -98,9 +92,9 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("获取设置数据失败:", error);
       toast({
+        variant: "destructive",
         title: "错误",
         description: "获取设置数据失败，请稍后再试",
-        variant: "destructive",
       });
       setIsLoading(false);
     }
@@ -110,9 +104,9 @@ export default function SettingsPage() {
   async function handleSaveSiteSettings() {
     if (!hasPermission(AdminPermission.ADMIN_ACCESS)) {
       toast({
+        variant: "destructive",
         title: "错误",
         description: "您没有权限修改系统设置",
-        variant: "destructive",
       });
       return;
     }
@@ -135,15 +129,17 @@ export default function SettingsPage() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       toast({
+        variant: "default",
         title: "成功",
         description: "网站设置已保存",
+        duration: 3000,
       });
     } catch (error) {
       console.error("保存设置失败:", error);
       toast({
+        variant: "destructive",
         title: "错误",
         description: error instanceof Error ? error.message : "保存设置失败，请稍后再试",
-        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -154,9 +150,9 @@ export default function SettingsPage() {
   async function handleSaveEmailSettings() {
     if (!hasPermission(AdminPermission.ADMIN_ACCESS)) {
       toast({
+        variant: "destructive",
         title: "错误",
         description: "您没有权限修改邮件设置",
-        variant: "destructive",
       });
       return;
     }
@@ -168,15 +164,17 @@ export default function SettingsPage() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       toast({
+        variant: "default",
         title: "成功",
         description: "邮件设置已保存",
+        duration: 3000,
       });
     } catch (error) {
       console.error("保存邮件设置失败:", error);
       toast({
+        variant: "destructive",
         title: "错误",
         description: error instanceof Error ? error.message : "保存邮件设置失败，请稍后再试",
-        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -192,15 +190,17 @@ export default function SettingsPage() {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({
+        variant: "default",
         title: "成功",
         description: "测试邮件已发送",
+        duration: 3000,
       });
     } catch (error) {
       console.error("测试邮件发送失败:", error);
       toast({
+        variant: "destructive",
         title: "错误",
         description: error instanceof Error ? error.message : "测试邮件发送失败，请稍后再试",
-        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -208,7 +208,7 @@ export default function SettingsPage() {
   }
   
   // 更新网站设置
-  function updateSiteSettings(field: keyof SiteSettings, value: any) {
+  function updateSiteSettings(field: keyof SiteSettings, value: string | number | boolean) {
     setSiteSettings(prev => ({
       ...prev,
       [field]: value
@@ -216,7 +216,7 @@ export default function SettingsPage() {
   }
   
   // 更新邮件设置
-  function updateEmailSettings(field: keyof EmailSettings, value: any) {
+  function updateEmailSettings(field: keyof EmailSettings, value: string | number | boolean) {
     setEmailSettings(prev => ({
       ...prev,
       [field]: value
@@ -317,50 +317,6 @@ export default function SettingsPage() {
                           <SelectItem value="contributor">贡献者</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="registrationEnabled">允许注册</Label>
-                        <p className="text-sm text-muted-foreground">
-                          启用时允许新用户注册网站账号
-                        </p>
-                      </div>
-                      <Switch 
-                        id="registrationEnabled"
-                        checked={siteSettings.registrationEnabled}
-                        onCheckedChange={value => updateSiteSettings('registrationEnabled', value)}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="commentsEnabled">允许评论</Label>
-                        <p className="text-sm text-muted-foreground">
-                          启用时用户可以在帖子下发表评论
-                        </p>
-                      </div>
-                      <Switch 
-                        id="commentsEnabled"
-                        checked={siteSettings.commentsEnabled}
-                        onCheckedChange={value => updateSiteSettings('commentsEnabled', value)}
-                      />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="maintenanceMode" className="text-destructive">维护模式</Label>
-                        <p className="text-sm text-muted-foreground">
-                          启用时网站将对普通用户显示维护页面
-                        </p>
-                      </div>
-                      <Switch 
-                        id="maintenanceMode"
-                        checked={siteSettings.maintenanceMode}
-                        onCheckedChange={value => updateSiteSettings('maintenanceMode', value)}
-                      />
                     </div>
                   </div>
                   

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { Permission } from "@/lib/permissions";
+import { authOptions } from "@/lib/auth/options";
+import { AdminPermission } from "@/lib/permissions";
+import { clearParametersCache } from "@/lib/system-parameters";
 
 const prisma = new PrismaClient();
 
@@ -22,8 +23,8 @@ interface ExtendedSession {
   };
 }
 
-// 检查用户是否有指定权限
-async function checkPermission(session: ExtendedSession | null, permission: string): Promise<boolean> {
+// 检查用户是否有管理员权限
+async function checkAdminPermission(session: ExtendedSession | null): Promise<boolean> {
   if (!session?.user?.id) return false;
   
   // 如果 session 中已有角色和权限信息
@@ -34,7 +35,7 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
         permissions.push(...role.role.permissions);
       }
     });
-    return permissions.includes(permission);
+    return permissions.includes(AdminPermission.ADMIN_ACCESS);
   }
   
   // 否则从数据库查询
@@ -51,9 +52,9 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
   
   if (!user) return false;
   
-  // 检查用户的角色是否有指定权限
+  // 检查用户的角色是否有管理员权限
   for (const userRole of user.userRoles || []) {
-    if (userRole.role.permissions.includes(permission)) {
+    if (userRole.role.permissions.includes(AdminPermission.ADMIN_ACCESS)) {
       return true;
     }
   }
@@ -62,13 +63,13 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
 }
 
 // 获取系统设置
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // 权限检查
+    // 权限检查 - 只需要管理员权限
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasViewPermission = await checkPermission(session, Permission.VIEW_SETTINGS);
+    const isAdmin = await checkAdminPermission(session);
     
-    if (!hasViewPermission) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "没有权限查看系统设置" },
         { status: 403 }
@@ -97,11 +98,11 @@ export async function GET(request: NextRequest) {
 // 更新系统设置
 export async function PUT(request: NextRequest) {
   try {
-    // 权限检查
+    // 权限检查 - 只需要管理员权限
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasEditPermission = await checkPermission(session, Permission.EDIT_SETTINGS);
+    const isAdmin = await checkAdminPermission(session);
     
-    if (!hasEditPermission) {
+    if (!isAdmin) {
       return NextResponse.json(
         { error: "没有权限修改系统设置" },
         { status: 403 }
@@ -127,6 +128,9 @@ export async function PUT(request: NextRequest) {
     });
     
     await Promise.all(updatePromises);
+    
+    // 清除参数缓存，确保系统能立即使用新参数值
+    clearParametersCache();
     
     // 记录操作日志
     await prisma.adminLog.create({

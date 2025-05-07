@@ -312,24 +312,24 @@ export default function PostsPage() {
         throw new Error("更新帖子状态失败");
       }
       
-      // 创建系统通知
-      const notificationResponse = await fetch(`/api/notifications`, {
+      // 创建系统通知 - 修改为消息表接口
+      const messageResponse = await fetch(`/api/user/messages`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "X-Admin-Request": "true"
         },
         body: JSON.stringify({
           userId: rejectingPost.author.id,
-          type: "POST_REJECTED",
+          type: "system",
           title: "帖子审核未通过",
           content: `您的帖子"${rejectingPost.title}"未通过审核。原因: ${rejectReason || "不符合社区规范"}`,
-          relatedId: rejectingPost.id,
-          relatedType: "post"
+          postId: rejectingPost.id
         })
       });
       
-      if (!notificationResponse.ok) {
-        console.error("发送通知失败");
+      if (!messageResponse.ok) {
+        console.error("发送消息通知失败");
       }
       
       toast({

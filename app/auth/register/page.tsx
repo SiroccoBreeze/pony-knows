@@ -11,6 +11,47 @@ import { useAuth } from "@/lib/auth";
 export default function RegisterPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const [loading, setLoading] = React.useState(true);
+  
+  // 检查注册功能是否启用
+  React.useEffect(() => {
+    async function checkRegistrationEnabled() {
+      try {
+        setLoading(true);
+        // 获取registration参数
+        const response = await fetch("/api/system-parameters", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ key: "enable_registration" }),
+          cache: "no-store"
+        });
+        
+        if (!response.ok) {
+          // 如果API调用失败，默认为可访问
+          setLoading(false);
+          return;
+        }
+        
+        const data = await response.json();
+        const registrationEnabled = data.value === "true";
+        
+        // 如果注册功能被禁用，重定向到首页
+        if (!registrationEnabled) {
+          router.push("/");
+          return;
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("检查注册功能状态失败:", error);
+        setLoading(false);
+      }
+    }
+    
+    checkRegistrationEnabled();
+  }, [router]);
   
   // 如果用户已登录，重定向到首页
   React.useEffect(() => {
@@ -24,6 +65,18 @@ export default function RegisterPage() {
     router.push("/");
     router.refresh(); // 强制刷新页面以更新状态
   };
+
+  // 显示加载状态
+  if (loading) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
+          <p className="mt-2">加载中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full">

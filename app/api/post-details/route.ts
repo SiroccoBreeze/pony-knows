@@ -1,5 +1,24 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
+import { AdminPermission } from "@/lib/permissions";
+
+// 扩展 Session 类型
+interface ExtendedSession {
+  user?: {
+    id: string;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+    roles?: {
+      role: {
+        name: string;
+        permissions: string[];
+      }
+    }[];
+  };
+}
 
 // 使用查询参数而非动态路由
 export async function GET(request: Request) {
@@ -49,6 +68,56 @@ export async function GET(request: Request) {
         { error: "帖子不存在" },
         { status: 404 }
       );
+    }
+
+    // 检查帖子审核状态
+    if (post.reviewStatus !== 'approved') {
+      // 获取当前用户会话
+      const session = await getServerSession(authOptions) as ExtendedSession;
+      
+      // 检查用户是否是帖子作者或管理员
+      let hasViewPermission = false;
+      
+      if (session?.user) {
+        // 检查是否是作者
+        const isAuthor = post.author.id === session.user.id;
+        
+        // 检查是否是管理员
+        let isAdmin = false;
+        const userPermissions: string[] = [];
+        
+        if (session.user.roles) {
+          session.user.roles.forEach(role => {
+            if (role.role.permissions) {
+              userPermissions.push(...role.role.permissions);
+            }
+          });
+          
+          // 检查是否有管理员权限
+          isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
+          
+          // 超级管理员检查
+          const isSuperAdmin = session.user.roles.some(role => role.role.name === "超级管理员");
+          if (isSuperAdmin) {
+            isAdmin = true;
+          }
+        }
+        
+        hasViewPermission = isAuthor || isAdmin;
+      }
+      
+      // 如果没有查看权限，返回403错误
+      if (!hasViewPermission) {
+        return NextResponse.json(
+          { 
+            error: "无权查看此帖子",
+            details: post.reviewStatus === 'pending' 
+              ? "该帖子正在等待审核，暂时无法查看" 
+              : "该帖子未通过审核，无法查看"
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 只有首次访问时才增加浏览量
