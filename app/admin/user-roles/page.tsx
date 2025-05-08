@@ -30,16 +30,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Plus, ShieldCheck, Shield, Trash2, Pencil, Users, Search } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { AdminPermission, UserPermission } from "@/lib/permissions";
@@ -53,7 +43,11 @@ import {
 import { RestrictedRoute } from "@/components/restricted-route";
 
 // 权限分组配置
-const PERMISSION_GROUPS = [
+const PERMISSION_GROUPS: {
+  id: string;
+  name: string;
+  permissions: string[];
+}[] = [
   {
     id: "admin",
     name: "管理员权限",
@@ -96,7 +90,7 @@ const PERMISSION_GROUPS = [
 ];
 
 // 获取系统支持的所有权限列表
-const ALL_VALID_PERMISSIONS = PERMISSION_GROUPS.flatMap(group => group.permissions) as string[];
+const ALL_VALID_PERMISSIONS = PERMISSION_GROUPS.flatMap(group => group.permissions);
 
 // 获取权限显示名称
 function getPermissionName(permission: string): string {
@@ -146,10 +140,8 @@ export default function UserRolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [formData, setFormData] = useState(initialFormState);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [deleteRoleId, setDeleteRoleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
   const { toast } = useToast();
@@ -224,33 +216,39 @@ export default function UserRolesPage() {
     }
   }
   
-  // 打开删除确认对话框
-  function handleDeleteConfirm(roleId: string) {
-    setDeleteRoleId(roleId);
-    setIsDeleteDialogOpen(true);
-  }
-  
-  // 执行删除角色
-  async function handleDeleteRole() {
-    if (!deleteRoleId) return;
+  // 打开删除确认对话框并执行删除
+  async function handleDeleteRole(roleId: string) {
+    if (isLoading) return;
+    
+    // 使用浏览器原生的确认对话框
+    const confirmed = window.confirm("确认删除该角色？此操作将永久删除该用户角色，且无法恢复。若有用户正在使用此角色，则无法删除。");
+    
+    if (!confirmed) return;
     
     try {
-      const response = await fetch(`/api/admin/user-roles/${deleteRoleId}`, {
+      setIsLoading(true);
+      
+      const response = await fetch(`/api/admin/user-roles/${roleId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        cache: 'no-cache'
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "删除角色失败");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "删除角色失败");
       }
       
+      // 更新本地状态
+      setRoles(prevRoles => prevRoles.filter(role => role.id !== roleId));
+      
+      // 显示成功通知
       toast({
         title: "成功",
         description: "角色已删除",
       });
-      
-      // 直接更新本地状态，而不是重新获取
-      setRoles(roles.filter(role => role.id !== deleteRoleId));
     } catch (error) {
       console.error("删除角色失败:", error);
       toast({
@@ -259,8 +257,7 @@ export default function UserRolesPage() {
         variant: "destructive",
       });
     } finally {
-      setIsDeleteDialogOpen(false);
-      setDeleteRoleId(null);
+      setIsLoading(false);
     }
   }
   
@@ -290,7 +287,7 @@ export default function UserRolesPage() {
       
       // 过滤权限，只保留有效的权限
       const validPermissions = formData.permissions.filter(
-        perm => ALL_VALID_PERMISSIONS.includes(perm as any)
+        perm => ALL_VALID_PERMISSIONS.includes(perm)
       );
       
       if (validPermissions.length !== formData.permissions.length) {
@@ -367,17 +364,13 @@ export default function UserRolesPage() {
   
   // 处理权限复选框变化
   function handlePermissionChange(permission: string, checked: boolean) {
-    // 确保只添加有效的权限
-    if (checked && !ALL_VALID_PERMISSIONS.includes(permission as any)) {
-      console.warn('尝试添加无效的权限:', permission);
-      return;
-    }
-    
     setFormData((prev) => {
       const permissions = [...prev.permissions];
       
       if (checked) {
-        permissions.push(permission);
+        if (!permissions.includes(permission)) {
+          permissions.push(permission);
+        }
       } else {
         const index = permissions.indexOf(permission);
         if (index !== -1) {
@@ -398,7 +391,7 @@ export default function UserRolesPage() {
       let permissions = [...prev.permissions];
       
       if (checked) {
-        // 添加分组中的所有权限（如果尚未添加）
+        // 添加分组中的所有权限
         groupPermissions.forEach((permission) => {
           if (!permissions.includes(permission)) {
             permissions.push(permission);
@@ -533,7 +526,7 @@ export default function UserRolesPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
-                                onClick={() => handleDeleteConfirm(role.id)}
+                                onClick={() => handleDeleteRole(role.id)}
                               >
                                 <Trash2 className="h-4 w-4 mr-2" />
                                 删除角色
@@ -689,27 +682,6 @@ export default function UserRolesPage() {
             </form>
           </DialogContent>
         </Dialog>
-        
-        {/* 删除确认对话框 */}
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>确认删除角色</AlertDialogTitle>
-              <AlertDialogDescription>
-                此操作将永久删除该用户角色，且无法恢复。若有用户正在使用此角色，则无法删除。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>取消</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteRole}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                确认删除
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </RestrictedRoute>
   );

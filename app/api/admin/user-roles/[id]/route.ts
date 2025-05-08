@@ -6,14 +6,18 @@ import { hasPermission } from '@/lib/permissions';
 import { AdminPermission } from '@/lib/permissions';
 import { createAdminLog } from '@/lib/admin-logs';
 
+// 强制动态路由，禁用缓存
+export const dynamic = 'force-dynamic';
+
 // 获取单个用户角色详情
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 确保提前解析params.id
-    const roleId = await Promise.resolve(params.id);
+    // 正确等待 params 解析
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
     
     // 检查权限
     const session = await getServerSession(authOptions);
@@ -36,7 +40,7 @@ export async function GET(
 
     // 获取角色详情
     const role = await prisma.role.findUnique({
-      where: { id: roleId }
+      where: { id }
     });
 
     if (!role) {
@@ -56,11 +60,12 @@ export async function GET(
 // 更新用户角色
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 确保提前解析params.id
-    const roleId = await Promise.resolve(params.id);
+    // 正确等待 params 解析
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
     
     // 检查权限
     const session = await getServerSession(authOptions);
@@ -101,7 +106,7 @@ export async function PUT(
 
     // 检查角色是否存在
     const existingRole = await prisma.role.findUnique({
-      where: { id: roleId }
+      where: { id }
     });
 
     if (!existingRole) {
@@ -113,7 +118,7 @@ export async function PUT(
       const nameExists = await prisma.role.findFirst({
         where: {
           name,
-          id: { not: roleId }
+          id: { not: id }
         }
       });
 
@@ -127,7 +132,7 @@ export async function PUT(
 
     // 更新角色
     const updatedRole = await prisma.role.update({
-      where: { id: roleId },
+      where: { id },
       data: {
         name,
         description,
@@ -160,11 +165,12 @@ export async function PUT(
 // 删除用户角色
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // 确保提前解析params.id
-    const roleId = await Promise.resolve(params.id);
+    // 正确等待 params 解析
+    const resolvedParams = await params;
+    const id = resolvedParams.id;
     
     // 检查权限
     const session = await getServerSession(authOptions);
@@ -187,7 +193,7 @@ export async function DELETE(
 
     // 检查角色是否存在
     const role = await prisma.role.findUnique({
-      where: { id: roleId }
+      where: { id }
     });
 
     if (!role) {
@@ -196,7 +202,7 @@ export async function DELETE(
 
     // 检查是否有用户使用此角色
     const usersWithRole = await prisma.userRole.count({
-      where: { roleId: roleId }
+      where: { roleId: id }
     });
 
     if (usersWithRole > 0) {
@@ -208,7 +214,7 @@ export async function DELETE(
 
     // 删除角色
     await prisma.role.delete({
-      where: { id: roleId }
+      where: { id }
     });
 
     // 记录管理员操作日志
@@ -216,7 +222,7 @@ export async function DELETE(
       userId: session.user.id,
       action: '删除',
       resource: '用户角色',
-      resourceId: roleId,
+      resourceId: id,
       details: { deletedRole: role }
     });
 

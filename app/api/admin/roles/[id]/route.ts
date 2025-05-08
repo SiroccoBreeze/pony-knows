@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/options";
-import { Permission } from "@/lib/permissions";
+import { AdminPermission } from "@/lib/permissions";
+
+// 强制动态路由，禁用缓存
+export const dynamic = 'force-dynamic';
 
 const prisma = new PrismaClient();
 
@@ -64,12 +67,12 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
 // 获取单个角色详情
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 权限检查
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasViewPermission = await checkPermission(session, Permission.VIEW_ROLES);
+    const hasViewPermission = await checkPermission(session, AdminPermission.ADMIN_ACCESS);
     
     if (!hasViewPermission) {
       return NextResponse.json(
@@ -78,7 +81,9 @@ export async function GET(
       );
     }
     
-    const roleId = params.id;
+    // 正确等待 params 解析
+    const resolvedParams = await params;
+    const roleId = resolvedParams.id;
     
     // 获取角色及其关联的用户数量
     const role = await prisma.role.findUnique({
@@ -125,12 +130,12 @@ export async function GET(
 // 更新角色
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 权限检查
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasEditPermission = await checkPermission(session, Permission.EDIT_ROLE);
+    const hasEditPermission = await checkPermission(session, AdminPermission.ADMIN_ACCESS);
     
     if (!hasEditPermission) {
       return NextResponse.json(
@@ -139,7 +144,9 @@ export async function PUT(
       );
     }
     
-    const roleId = params.id;
+    // 正确等待 params 解析
+    const resolvedParams = await params;
+    const roleId = resolvedParams.id;
     const { name, description, permissions } = await request.json();
     
     // 验证必要字段
@@ -220,12 +227,12 @@ export async function PUT(
 // 删除角色
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 权限检查
     const session = await getServerSession(authOptions) as ExtendedSession;
-    const hasDeletePermission = await checkPermission(session, Permission.DELETE_ROLE);
+    const hasDeletePermission = await checkPermission(session, AdminPermission.ADMIN_ACCESS);
     
     if (!hasDeletePermission) {
       return NextResponse.json(
@@ -234,7 +241,9 @@ export async function DELETE(
       );
     }
     
-    const roleId = params.id;
+    // 正确等待 params 解析
+    const resolvedParams = await params;
+    const roleId = resolvedParams.id;
     
     // 检查角色是否存在
     const existingRole = await prisma.role.findUnique({

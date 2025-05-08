@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuthPermissions } from "@/hooks/use-auth-permissions";
-import { AdminPermission } from "@/lib/permissions";
 import {
   LayoutDashboard,
   Users,
@@ -57,14 +56,12 @@ function SidebarItem({ icon, label, href, isActive }: SidebarItemProps) {
 export function AdminSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const { hasPermission, permissions } = useAuthPermissions();
+  const { permissions } = useAuthPermissions();
   
-  // 检查用户是否有管理员权限
-  const isAdmin = hasPermission(AdminPermission.ADMIN_ACCESS);
-  
-  // 创建一个渲染变量，而不是直接返回null
+  // 移除不必要的权限检查，总是显示侧边栏
   // 这样可以保持hooks调用的一致性
-  const shouldRenderSidebar = isAdmin;
+  // 原因：RestrictedRoute组件已经验证了管理员权限，不需要这里再检查
+  const shouldRenderSidebar = true;
   
   // 定义管理菜单项的数组 - 修正路径匹配实际目录结构
   const ADMIN_MENU = [

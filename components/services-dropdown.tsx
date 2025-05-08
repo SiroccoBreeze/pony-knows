@@ -48,13 +48,20 @@ function ListItem({ title, href, permission, isPermitted = true, children, icon 
  * 服务下拉菜单组件
  */
 export function ServicesDropdown() {
-  const { hasPermission, isLoading } = useAuthPermissions();
+  const { hasPermission, isLoading, permissions } = useAuthPermissions();
   const [showMenu, setShowMenu] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const permissionChecked = useRef(false);
   
-  // 一次性检查所有权限
-  const permissions = useMemo(() => {
+  // 存储各项服务的权限状态
+  const [servicePermissions, setServicePermissions] = useState({
+    hasServiceAccess: false,
+    hasDatabaseAccess: false,
+    hasMinioAccess: false,
+    hasFileDownloadAccess: false
+  });
+  
+  // 一次性检查所有权限 - 添加permissions作为依赖，确保权限变化时重新计算
+  const permissionsStatus = useMemo(() => {
     // 如果仍在加载，返回初始状态
     if (isLoading) return {
       hasServiceAccess: false,
@@ -74,6 +81,23 @@ export function ServicesDropdown() {
     const hasAnyServicePermission = hasServiceAccess || hasDatabaseAccess || 
                                   hasMinioAccess || hasFileDownloadAccess;
     
+    console.log("[ServicesDropdown] 服务权限检查:", {
+      hasServiceAccess,
+      hasDatabaseAccess,
+      hasMinioAccess,
+      hasFileDownloadAccess,
+      hasAnyServicePermission,
+      allPermissions: permissions
+    });
+    
+    // 更新权限状态
+    setServicePermissions({
+      hasServiceAccess,
+      hasDatabaseAccess,
+      hasMinioAccess,
+      hasFileDownloadAccess
+    });
+    
     return {
       hasServiceAccess,
       hasDatabaseAccess,
@@ -81,18 +105,118 @@ export function ServicesDropdown() {
       hasFileDownloadAccess,
       hasAnyServicePermission
     };
-  }, [hasPermission, isLoading]);
+  }, [hasPermission, isLoading, permissions]); // 添加permissions作为依赖
   
   // 设置是否显示菜单
   useEffect(() => {
-    if (permissionChecked.current || isLoading) return;
-    
-    // 标记为已检查
-    permissionChecked.current = true;
+    if (permissionChecked.current && !isLoading) return;
     
     // 更新菜单显示状态
-    setShowMenu(permissions.hasAnyServicePermission);
-  }, [permissions, isLoading]);
+    setShowMenu(permissionsStatus.hasAnyServicePermission);
+    
+    // 一旦检查过且不再加载，标记为已检查
+    if (!isLoading) {
+      permissionChecked.current = true;
+    }
+  }, [permissionsStatus, isLoading]);
+  
+  // 添加监听权限变化事件
+  useEffect(() => {
+    // 权限变化事件处理函数
+    const handlePermissionsChanged = (event: Event) => {
+      // 使用类型断言转换为自定义事件
+      const customEvent = event as CustomEvent<{permissions: string[]}>;
+      console.log("[ServicesDropdown] 接收到权限变化事件:", customEvent.detail?.permissions);
+      
+      // 直接检查权限，而不依赖useMemo重新计算
+      const currentPermissions = customEvent.detail?.permissions || [];
+      
+      const hasServiceAccess = currentPermissions.includes(UserPermission.VIEW_SERVICES);
+      const hasDatabaseAccess = currentPermissions.includes(UserPermission.ACCESS_DATABASE);
+      const hasMinioAccess = currentPermissions.includes(UserPermission.ACCESS_MINIO);
+      const hasFileDownloadAccess = currentPermissions.includes(UserPermission.ACCESS_FILE_DOWNLOADS);
+      
+      console.log("[ServicesDropdown] 权限变化后检查:", {
+        hasServiceAccess,
+        hasDatabaseAccess,
+        hasMinioAccess,
+        hasFileDownloadAccess
+      });
+      
+      // 更新权限状态
+      setServicePermissions({
+        hasServiceAccess,
+        hasDatabaseAccess,
+        hasMinioAccess,
+        hasFileDownloadAccess
+      });
+      
+      // 更新菜单显示状态
+      const hasAnyService = hasServiceAccess || hasDatabaseAccess || hasMinioAccess || hasFileDownloadAccess;
+      setShowMenu(hasAnyService);
+    };
+    
+    // 添加事件监听
+    if (typeof window !== 'undefined') {
+      window.addEventListener('permissions-changed', handlePermissionsChanged);
+    }
+    
+    // 清理函数
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('permissions-changed', handlePermissionsChanged);
+      }
+    };
+  }, []);
+  
+  // 添加监听权限初始化完成事件
+  useEffect(() => {
+    // 权限初始化完成事件处理函数
+    const handlePermissionsInitialized = (event: Event) => {
+      // 使用类型断言转换为自定义事件
+      const customEvent = event as CustomEvent<{permissions: string[]}>;
+      console.log("[ServicesDropdown] 接收到权限初始化完成事件:", customEvent.detail?.permissions);
+      
+      // 直接检查权限，而不依赖useMemo重新计算
+      const currentPermissions = customEvent.detail?.permissions || [];
+      
+      const hasServiceAccess = currentPermissions.includes(UserPermission.VIEW_SERVICES);
+      const hasDatabaseAccess = currentPermissions.includes(UserPermission.ACCESS_DATABASE);
+      const hasMinioAccess = currentPermissions.includes(UserPermission.ACCESS_MINIO);
+      const hasFileDownloadAccess = currentPermissions.includes(UserPermission.ACCESS_FILE_DOWNLOADS);
+      
+      console.log("[ServicesDropdown] 权限初始化后检查:", {
+        hasServiceAccess,
+        hasDatabaseAccess,
+        hasMinioAccess,
+        hasFileDownloadAccess
+      });
+      
+      // 更新权限状态
+      setServicePermissions({
+        hasServiceAccess,
+        hasDatabaseAccess,
+        hasMinioAccess,
+        hasFileDownloadAccess
+      });
+      
+      // 更新菜单显示状态
+      const hasAnyService = hasServiceAccess || hasDatabaseAccess || hasMinioAccess || hasFileDownloadAccess;
+      setShowMenu(hasAnyService);
+    };
+    
+    // 添加事件监听
+    if (typeof window !== 'undefined') {
+      window.addEventListener('permissions-initialized', handlePermissionsInitialized);
+    }
+    
+    // 清理函数
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('permissions-initialized', handlePermissionsInitialized);
+      }
+    };
+  }, []);
   
   // 如果用户没有任何服务权限或正在加载，则不显示下拉菜单
   if (!showMenu) return null;
@@ -100,57 +224,54 @@ export function ServicesDropdown() {
   // 预渲染菜单内容，避免悬停时才开始加载
   const menuContent = (
     <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 rounded-xl border border-border/40">
-      {/* 全部服务 - 基本服务权限就可访问 */}
-      <ListItem 
-        href="/services" 
-        title="全部服务"
-        permission={UserPermission.VIEW_SERVICES}
-        isPermitted={permissions.hasServiceAccess}
-        icon={<LayersIcon className="h-5 w-5" />}
-      >
-        查看我们提供的所有服务内容
-      </ListItem>
+      {/* 全部服务 - 有VIEW_SERVICES权限时显示 */}
+      {servicePermissions.hasServiceAccess && (
+        <ListItem 
+          href="/services" 
+          title="全部服务"
+          icon={<LayersIcon className="h-5 w-5" />}
+        >
+          查看我们提供的所有服务内容
+        </ListItem>
+      )}
       
       {/* 数据库结构 - 需要特定权限 */}
-      <ListItem 
-        href="/services/database" 
-        title="数据库结构"
-        permission={UserPermission.ACCESS_DATABASE}
-        isPermitted={permissions.hasDatabaseAccess}
-        icon={<Database className="h-5 w-5" />}
-      >
-        查询和浏览数据库表结构信息
-      </ListItem>
+      {servicePermissions.hasDatabaseAccess && (
+        <ListItem 
+          href="/services/database" 
+          title="数据库结构"
+          icon={<Database className="h-5 w-5" />}
+        >
+          查询和浏览数据库表结构信息
+        </ListItem>
+      )}
       
       {/* 网盘服务 - 需要特定权限 */}
-      <ListItem 
-        href="/services/minio" 
-        title="网盘服务"
-        permission={UserPermission.ACCESS_MINIO}
-        isPermitted={permissions.hasMinioAccess}
-        icon={<HardDrive className="h-5 w-5" />}
-      >
-        基于MinIO的对象存储服务
-      </ListItem>
+      {servicePermissions.hasMinioAccess && (
+        <ListItem 
+          href="/services/minio" 
+          title="网盘服务"
+          icon={<HardDrive className="h-5 w-5" />}
+        >
+          基于MinIO的对象存储服务
+        </ListItem>
+      )}
       
       {/* 资源下载 - 需要特定权限 */}
-      <ListItem 
-        href="/services/file-links" 
-        title="资源下载"
-        permission={UserPermission.ACCESS_FILE_DOWNLOADS}
-        isPermitted={permissions.hasFileDownloadAccess}
-        icon={<FileSymlink className="h-5 w-5" />}
-      >
-        查看和下载共享的网盘资源文件
-      </ListItem>
+      {servicePermissions.hasFileDownloadAccess && (
+        <ListItem 
+          href="/services/file-links" 
+          title="资源下载"
+          icon={<FileSymlink className="h-5 w-5" />}
+        >
+          查看和下载共享的网盘资源文件
+        </ListItem>
+      )}
     </ul>
   );
   
   return (
-    <NavigationMenu 
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-    >
+    <NavigationMenu>
       <NavigationMenuList>
         <NavigationMenuItem>
           <NavigationMenuTrigger className="px-3 py-2 rounded-md transition-all hover:bg-primary/5 text-foreground/70 hover:text-foreground data-[state=open]:bg-accent/50 data-[state=open]:text-foreground">

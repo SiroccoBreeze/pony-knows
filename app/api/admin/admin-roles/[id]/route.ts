@@ -99,7 +99,7 @@ export async function PUT(
     }
 
     // 确保管理员角色必须包含ADMIN_ACCESS权限
-    let updatedPermissions = [...permissions];
+    const updatedPermissions = [...permissions];
     if (!updatedPermissions.includes(AdminPermission.ADMIN_ACCESS)) {
       updatedPermissions.push(AdminPermission.ADMIN_ACCESS);
     }

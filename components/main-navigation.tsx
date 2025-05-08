@@ -34,13 +34,12 @@ export function MainNavigation() {
         permission={UserPermission.ACCESS_WORKING_PAPERS}
       />
       
-      {/* 论坛导航项 - 直接根据状态显示，避免NavigationItem的二次权限检查 */}
+      {/* 论坛导航项 - 直接使用状态控制显示，而不是再次通过permission属性检查 */}
       {showForumTab && (
         <NavigationItem 
           href="/forum" 
           label="论坛" 
           icon={<MessageCircle className="h-4 w-4" />} 
-          permission={UserPermission.VIEW_FORUM}
         />
       )}
       

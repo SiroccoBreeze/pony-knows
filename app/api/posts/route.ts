@@ -96,6 +96,147 @@ export async function POST(request: Request) {
       }
     });
 
+    // 处理帖子内容中的图片和文件链接
+    // 不论帖子状态（草稿或发布），都处理文件关联和迁移
+    console.log(`处理帖子ID ${post.id} 的媒体文件，帖子状态: ${status}`);
+    
+    // 处理图片链接 - 匹配 Markdown 图片语法 ![alt](url)
+    const imageLinksRegex = /!\[(.*?)\]\(([^)]+)\)/g;
+    const imageUrls: string[] = [];
+    let imageMatch;
+    
+    while ((imageMatch = imageLinksRegex.exec(content)) !== null) {
+      const url = imageMatch[2];
+      if (url && url.includes('/api/files/')) {
+        imageUrls.push(url);
+        console.log('检测到图片链接:', url);
+      }
+    }
+    
+    // 处理文件链接 - 匹配 Markdown 链接语法 [text](url)，但排除已匹配的图片
+    const fileLinksRegex = /\[(.*?)\]\(([^)]+)\)/g;
+    const fileUrls: string[] = [];
+    let fileMatch;
+    
+    while ((fileMatch = fileLinksRegex.exec(content)) !== null) {
+      const linkText = fileMatch[1];
+      const url = fileMatch[2];
+      
+      // 检查是否是 API 文件链接，并且不是图片链接
+      if (url && url.includes('/api/files/') && !content.includes(`![${linkText}](${url})`)) {
+        fileUrls.push(url);
+        console.log('检测到文件链接:', url);
+      }
+    }
+    
+    // 处理所有检测到的媒体文件链接
+    const allUrls = [...imageUrls, ...fileUrls];
+    
+    if (allUrls.length > 0) {
+      const userId = session.user.id;
+      console.log(`检测到 ${allUrls.length} 个媒体文件链接，开始处理...`);
+      
+      for (const fileUrl of allUrls) {
+        try {
+          // 解析 URL
+          const urlObj = new URL(fileUrl, request.headers.get('origin') || 'http://localhost');
+          const urlPath = urlObj.pathname;
+          const pathParts = urlPath.split('/').filter(Boolean);
+          
+          // 检查 URL 格式是否正确 /api/files/:userId/:category/:filename
+          if (pathParts.length < 4 || pathParts[0] !== 'api' || pathParts[1] !== 'files') {
+            console.log(`URL 格式不正确，跳过: ${fileUrl}`);
+            continue;
+          }
+          
+          const urlUserId = pathParts[2];
+          const category = pathParts[3];
+          const filename = pathParts[4];
+          
+          if (urlUserId !== userId) {
+            console.log(`文件不属于当前用户，跳过: ${fileUrl}`);
+            continue;
+          }
+          
+          // 构造临时路径和正式路径
+          const tempPath = `users/${userId}/temp/${category}s/${filename}`;
+          const formalPath = `users/${userId}/posts/${category}s/${filename}`;
+          
+          // 推断文件类型
+          let fileType = category === 'image' ? 'image/jpeg' : 'application/octet-stream';
+          const fileExt = filename.split('.').pop()?.toLowerCase() || '';
+          
+          if (fileExt === 'png') fileType = 'image/png';
+          else if (fileExt === 'gif') fileType = 'image/gif';
+          else if (fileExt === 'pdf') fileType = 'application/pdf';
+          else if (['doc', 'docx'].includes(fileExt)) fileType = 'application/msword';
+          else if (['xls', 'xlsx'].includes(fileExt)) fileType = 'application/vnd.ms-excel';
+          else if (['zip', 'rar'].includes(fileExt)) fileType = 'application/zip';
+          
+          // 检查 MinIO 中的文件并迁移
+          try {
+            const { minioService } = await import('@/lib/minio');
+            
+            // 尝试从临时目录获取文件
+            let fileContent: Buffer;
+            try {
+              fileContent = await minioService.downloadFile(tempPath);
+              console.log(`找到临时文件: ${tempPath}`);
+              
+              // 迁移到正式目录
+              await minioService.uploadBuffer(fileContent, formalPath, fileType);
+              console.log(`成功上传到正式目录: ${formalPath}`);
+              
+              // 删除临时文件
+              await minioService.delete(tempPath);
+              console.log(`删除临时文件: ${tempPath}`);
+              
+              // 创建文件关联记录
+              await prisma.postImage.create({
+                data: {
+                  postId: post.id,
+                  url: fileUrl,
+                  filename: formalPath,
+                  type: fileType,
+                  size: fileContent.length
+                }
+              });
+              
+              console.log(`成功关联文件到帖子: 帖子ID=${post.id}, 文件路径=${formalPath}`);
+            } catch (tempError) {
+              console.log(`临时文件访问失败: ${tempError instanceof Error ? tempError.message : String(tempError)}`);
+              
+              // 检查文件是否已在正式目录
+              try {
+                fileContent = await minioService.downloadFile(formalPath);
+                console.log(`文件已在正式目录: ${formalPath}`);
+                
+                // 直接关联现有文件
+                await prisma.postImage.create({
+                  data: {
+                    postId: post.id,
+                    url: fileUrl,
+                    filename: formalPath,
+                    type: fileType,
+                    size: fileContent.length
+                  }
+                });
+                
+                console.log(`关联已存在的文件: 帖子ID=${post.id}, 文件路径=${formalPath}`);
+              } catch (error) {
+                // 忽略错误，只记录日志
+                console.error(`文件在临时和正式目录都不存在: ${fileUrl}`);
+              }
+            }
+          } catch (error) {
+            console.error(`处理文件失败: ${fileUrl}`, error);
+          }
+        } catch (error) {
+          console.error(`解析文件URL失败: ${fileUrl}`, error);
+        }
+      }
+    }
+
     // 如果帖子需要审核，返回相应提示
     if (reviewStatus === 'pending') {
       return NextResponse.json(
@@ -182,10 +323,10 @@ export async function GET(request: Request) {
       }
       
       const isAdmin = userPermissions.includes(AdminPermission.ADMIN_ACCESS);
-      const canViewAllPosts = userPermissions.includes(AdminPermission.VIEW_POSTS);
+      const canViewAllPosts = isAdmin; // 简化检查，admin可以查看所有帖子
       
       // 如果不是管理员请求/管理员权限/作者本人查看，只显示已审核通过的帖子
-      if (!isAdminRequest && !isSuperAdmin && !isAdmin && !canViewAllPosts && 
+      if (!isAdminRequest && !isSuperAdmin && !isAdmin && 
           (!session?.user?.id || (authorId && authorId !== session.user.id))) {
         where.reviewStatus = 'approved';
       }

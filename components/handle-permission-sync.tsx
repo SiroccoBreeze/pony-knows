@@ -311,6 +311,14 @@ export default function HandlePermissionSync() {
           localStorage.setItem('cached_permissions', JSON.stringify(data.permissions));
           localStorage.setItem('cached_permissions_timestamp', now.toString());
           
+          // 触发全局权限变化事件，通知其他组件更新
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('permissions-changed', {
+              detail: { permissions: data.permissions }
+            }));
+            console.log("权限变化事件已触发");
+          }
+          
           console.log("权限同步完成，保存到本地存储");
         } else {
           console.error('权限同步返回了无效数据:', data);

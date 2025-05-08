@@ -29,7 +29,7 @@ export function NavigationItem({
   icon
 }: NavigationItemProps) {
   const pathname = usePathname();
-  const { hasPermission } = useAuthPermissions();
+  const { hasPermission, permissions } = useAuthPermissions();
   const [isVisible, setIsVisible] = useState(!permission);
   const isActive = pathname === href || pathname?.startsWith(`${href}/`);
   const hasCheckedPermission = useRef(false);
@@ -42,7 +42,7 @@ export function NavigationItem({
     }
   }, [permission, label]);
   
-  // 使用客户端权限检查
+  // 使用客户端权限检查 - 添加permissions作为依赖项以响应权限变化
   useEffect(() => {
     // 没有权限要求时直接显示
     if (!permission) {
@@ -57,15 +57,15 @@ export function NavigationItem({
     if (Array.isArray(permission)) {
       // 多个权限中任意一个
       const hasAnyPermission = permission.some(p => hasPermission(p));
-      console.log(`[NavigationItem] ${label} 客户端权限检查(多个):`, hasAnyPermission, permission);
+      console.log(`[NavigationItem] ${label} 客户端权限检查(多个):`, hasAnyPermission, permission, "当前权限:", permissions);
       setIsVisible(hasAnyPermission);
     } else {
       // 单个权限
       const hasPerm = hasPermission(permission);
-      console.log(`[NavigationItem] ${label} 客户端权限检查(单个):`, hasPerm, permission);
+      console.log(`[NavigationItem] ${label} 客户端权限检查(单个):`, hasPerm, permission, "当前权限:", permissions);
       setIsVisible(hasPerm);
     }
-  }, [hasPermission, permission, label]);
+  }, [hasPermission, permission, label, permissions]); // 添加permissions作为依赖
   
   // 权限检查已完成，但无权访问
   if (!isVisible) {
