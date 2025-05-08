@@ -21,9 +21,9 @@ const GLOBAL_CACHE_DURATION = 5000; // 增加全局缓存时间为5秒有效，�
 let pendingRequest: Promise<string[]> | null = null; // 用于防止并发请求
 
 // 防抖函数
-const debounce = (fn: Function, ms = 300) => {
+const debounce = (fn: (...args: unknown[]) => void, ms = 300) => {
   let timeoutId: ReturnType<typeof setTimeout>;
-  return function(...args: any[]) {
+  return function(...args: unknown[]) {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), ms);
   };
@@ -31,6 +31,19 @@ const debounce = (fn: Function, ms = 300) => {
 
 // 添加一个重置全局缓存的函数
 export function resetGlobalPermissionsCache() {
+  // 检查上次重置时间，防止频繁重置
+  const now = Date.now();
+  const lastResetTime = localStorage.getItem('permission_cache_reset_timestamp');
+  
+  // 如果2秒内已经重置过，跳过本次重置
+  if (lastResetTime && (now - parseInt(lastResetTime)) < 2000) {
+    console.log("权限缓存重置太频繁，跳过本次重置");
+    return;
+  }
+  
+  // 记录本次重置时间
+  localStorage.setItem('permission_cache_reset_timestamp', now.toString());
+  
   console.log("重置全局权限缓存");
   globalPermissionsCache = null;
   globalCacheTimestamp = 0;

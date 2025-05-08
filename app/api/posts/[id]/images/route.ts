@@ -11,7 +11,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const postId = params.id;
+    // 确保params是已解析的
+    const paramsData = await Promise.resolve(params);
+    const postId = paramsData.id;
+    
     if (!postId) {
       return NextResponse.json({ error: '无效的帖子ID' }, { status: 400 });
     }
@@ -56,7 +59,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const postId = params.id;
+    // 确保params是已解析的
+    const paramsData = await Promise.resolve(params);
+    const postId = paramsData.id;
+    
     if (!postId) {
       return NextResponse.json({ error: '无效的帖子ID' }, { status: 400 });
     }
@@ -167,7 +173,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const postId = params.id;
+    // 确保params是已解析的
+    const paramsData = await Promise.resolve(params);
+    const postId = paramsData.id;
+    
     if (!postId) {
       return NextResponse.json({ error: '无效的帖子ID' }, { status: 400 });
     }

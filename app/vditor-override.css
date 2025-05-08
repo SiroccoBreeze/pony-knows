@@ -184,4 +184,89 @@
 
 .image-modal-close:hover {
   background-color: rgba(255, 255, 255, 0.4);
+}
+
+/* 在上传过程中禁用编辑器工具栏的样式 */
+.vditor-toolbar-disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* 确保上传进度条样式 */
+.vditor-upload-panel {
+  padding: 10px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background-color: white;
+}
+
+/* 文件上传状态覆盖层 */
+.vditor-upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+/* 文件上传进度容器 */
+.vditor-upload-progress-container {
+  background-color: white;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  width: 100%;
+}
+
+/* 禁用图片缩放时的错误指示器 */
+.vditor-wysiwyg .vditor-resize {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 修复图片大小调整的问题 */
+.vditor-resize {
+  max-width: 100%;
+}
+
+/* 增加非图片附件的样式 */
+.vditor-wysiwyg a[href$=".pdf"],
+.vditor-wysiwyg a[href$=".doc"],
+.vditor-wysiwyg a[href$=".docx"],
+.vditor-wysiwyg a[href$=".xls"],
+.vditor-wysiwyg a[href$=".xlsx"],
+.vditor-wysiwyg a[href$=".zip"],
+.vditor-wysiwyg a[href$=".rar"],
+.vditor-wysiwyg a[href$=".7z"] {
+  display: inline-flex;
+  align-items: center;
+  margin: 4px 0;
+  padding: 6px 10px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  text-decoration: none;
+  color: #343a40;
+  font-size: 14px;
+}
+
+.vditor-wysiwyg a[href$=".pdf"]:hover,
+.vditor-wysiwyg a[href$=".doc"]:hover,
+.vditor-wysiwyg a[href$=".docx"]:hover,
+.vditor-wysiwyg a[href$=".xls"]:hover,
+.vditor-wysiwyg a[href$=".xlsx"]:hover,
+.vditor-wysiwyg a[href$=".zip"]:hover,
+.vditor-wysiwyg a[href$=".rar"]:hover,
+.vditor-wysiwyg a[href$=".7z"]:hover {
+  background-color: #e9ecef;
+  border-color: #dee2e6;
 } 

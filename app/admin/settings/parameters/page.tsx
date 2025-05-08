@@ -24,6 +24,7 @@ import { AlertCircle, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RestrictedRoute } from "@/components/restricted-route";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 
 interface SystemParameter {
   id: string;
@@ -114,10 +115,12 @@ export default function ParametersConfigPage() {
   }
   
   // 更新参数值
-  function updateParameterValue(id: string, value: boolean) {
+  function updateParameterValue(id: string, value: string | boolean) {
+    const stringValue = typeof value === "boolean" ? value.toString() : value;
+    
     setParameters(prevParams => 
       prevParams.map(param => 
-        param.id === id ? { ...param, value: value.toString() } : param
+        param.id === id ? { ...param, value: stringValue } : param
       )
     );
   }
@@ -170,7 +173,7 @@ export default function ParametersConfigPage() {
                 <TableRow>
                   <TableHead className="w-[300px]">参数名称</TableHead>
                   <TableHead>描述</TableHead>
-                  <TableHead className="w-[100px] text-right">状态</TableHead>
+                  <TableHead className="w-[250px] text-right">值</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -182,35 +185,51 @@ export default function ParametersConfigPage() {
                   </TableRow>
                 ) : (
                   parameters.map(param => (
-                    param.type === "boolean" && (
-                      <TableRow key={param.id}>
-                        <TableCell className="font-medium">
-                          {param.label}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-2">
-                            <p className="text-sm text-muted-foreground">
-                              {getParameterDescription(param.key)}
-                            </p>
-                            {getParameterWarning(param.key, param.value) && (
-                              <Alert>
-                                <AlertCircle className="h-4 w-4" />
-                                <AlertTitle>注意</AlertTitle>
-                                <AlertDescription>
-                                  {getParameterWarning(param.key, param.value)}
-                                </AlertDescription>
-                              </Alert>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
+                    <TableRow key={param.id}>
+                      <TableCell className="font-medium">
+                        {param.label}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          <p className="text-sm text-muted-foreground">
+                            {getParameterDescription(param.key)}
+                          </p>
+                          {getParameterWarning(param.key, param.value) && (
+                            <Alert>
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle>注意</AlertTitle>
+                              <AlertDescription>
+                                {getParameterWarning(param.key, param.value)}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {param.type === "boolean" && (
                           <Switch
                             checked={getParameterBoolValue(param.value)}
                             onCheckedChange={(checked) => updateParameterValue(param.id, checked)}
                           />
-                        </TableCell>
-                      </TableRow>
-                    )
+                        )}
+                        {param.type === "number" && (
+                          <Input
+                            type="number"
+                            value={param.value}
+                            onChange={(e) => updateParameterValue(param.id, e.target.value)}
+                            className="w-full"
+                          />
+                        )}
+                        {param.type === "text" && (
+                          <Input
+                            type="text"
+                            value={param.value}
+                            onChange={(e) => updateParameterValue(param.id, e.target.value)}
+                            className="w-full"
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
               </TableBody>
@@ -251,7 +270,10 @@ function getParameterDescription(key: string): string {
     "post_moderation": "启用后，新发布的帖子需要管理员审核才能显示", 
     "comment_moderation": "启用后，新发表的评论需要管理员审核才能显示",
     "enable_file_upload": "启用后，允许用户上传文件附件",
-    "enable_rich_editor": "启用后，使用富文本编辑器代替纯文本编辑器"
+    "enable_rich_editor": "启用后，使用富文本编辑器代替纯文本编辑器",
+    "upload_enabled": "启用后，允许用户在帖子编辑器中上传文件",
+    "upload_max_file_size_mb": "设置允许上传的文件最大大小，单位为MB（默认5MB）",
+    "upload_allowed_file_types": "设置允许上传的文件类型列表，使用MIME类型格式，多个类型用逗号分隔（例如image/jpeg,image/png）"
   };
   
   return descriptions[key] || "无描述";

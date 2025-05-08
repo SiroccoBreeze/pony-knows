@@ -201,6 +201,38 @@ class MinioService {
     }
   }
 
+  // 获取文件缓冲区 - 用于API返回文件内容
+  async getFileBuffer(path: string): Promise<Buffer> {
+    try {
+      return await this.downloadFile(path);
+    } catch (error) {
+      console.error(`获取文件缓冲区失败: ${path}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 检查文件是否存在
+   * @param path 文件路径
+   * @returns 布尔值，表示文件是否存在
+   */
+  async fileExists(path: string): Promise<boolean> {
+    try {
+      await this.ensureBucket();
+      const formattedPath = this.formatPath(path);
+      await this.client.statObject(this.defaultBucket, formattedPath);
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof Error && 
+         (error.name === 'NoSuchKey' || error.name === 'NotFound')) {
+        return false;
+      }
+      // 对于其他类型的错误，记录日志但仍然返回false
+      console.error(`检查文件是否存在时出错: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  }
+
   // 创建文件夹
   async createFolder(path: string): Promise<void> {
     await this.ensureBucket();

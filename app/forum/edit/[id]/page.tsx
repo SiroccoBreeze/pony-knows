@@ -91,7 +91,6 @@ export default function PostEditPage({ params }: PostEditPageProps) {
   const [open, setOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [isMobile, setIsMobile] = useState(false);
-  const [hasEditPermission, setHasEditPermission] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,7 +113,6 @@ export default function PostEditPage({ params }: PostEditPageProps) {
         if (!authCheckResponse.ok) {
           const errorData = await authCheckResponse.json();
           setPermissionError(errorData.error || "您没有权限编辑此帖子");
-          setHasEditPermission(false);
           setIsLoadingPost(false);
           return;
         }
@@ -131,7 +129,6 @@ export default function PostEditPage({ params }: PostEditPageProps) {
           tags: data.postTags ? data.postTags.map((pt: PostTag) => pt.tag) : []
         };
         setPost(formattedData);
-        setHasEditPermission(true);
       } catch (error) {
         console.error("获取帖子出错:", error);
         toast({
@@ -236,6 +233,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       shouldTouch: true,
       shouldValidate: false,
     });
+    console.log('编辑器内容已更新:', value);
   };
 
   // 保持编辑器内容
@@ -252,14 +250,16 @@ export default function PostEditPage({ params }: PostEditPageProps) {
     if (!selectedTags.find(t => t.id === tag.id)) {
       const newTags = [...selectedTags, tag];
       setSelectedTags(newTags);
-      form.setValue("tags", newTags.map(t => t.name).join(", "), {
+      const tagsString = newTags.map(t => t.name).join(", ");
+      form.setValue("tags", tagsString, {
         shouldDirty: true,
         shouldTouch: true,
       });
     } else {
       const newTags = selectedTags.filter(t => t.id !== tag.id);
       setSelectedTags(newTags);
-      form.setValue("tags", newTags.map(t => t.name).join(", "), {
+      const tagsString = newTags.map(t => t.name).join(", ");
+      form.setValue("tags", tagsString, {
         shouldDirty: true,
         shouldTouch: true,
       });
@@ -295,6 +295,16 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       return;
     }
     
+    // 再次从编辑器获取最新内容，确保包含文件链接
+    if (editorRef.current) {
+      try {
+        contentRef.current = editorRef.current.getValue();
+        console.log('保存草稿前获取最新内容:', contentRef.current);
+      } catch (e) {
+        console.error('获取编辑器内容失败:', e);
+      }
+    }
+    
     // 设置状态为草稿并提交
     form.setValue("status", "draft");
     form.handleSubmit(onSubmit)();
@@ -319,6 +329,16 @@ export default function PostEditPage({ params }: PostEditPageProps) {
       return;
     }
     
+    // 再次从编辑器获取最新内容，确保包含文件链接
+    if (editorRef.current) {
+      try {
+        contentRef.current = editorRef.current.getValue();
+        console.log('发布帖子前获取最新内容:', contentRef.current);
+      } catch (e) {
+        console.error('获取编辑器内容失败:', e);
+      }
+    }
+    
     // 设置状态为发布并提交
     form.setValue("status", "published");
     form.handleSubmit(onSubmit)();
@@ -329,64 +349,235 @@ export default function PostEditPage({ params }: PostEditPageProps) {
     try {
       setIsLoading(true);
       
-      // 验证内容不能为空
-      if (!contentRef.current.trim()) {
-        toast({
-          title: "提示",
-          description: "请输入帖子内容",
-          variant: "default",
-          action: <ToastAction altText="close">关闭</ToastAction>,
-        });
-        setIsLoading(false);
-        return;
+      // 从编辑器中获取最新内容
+      let currentContent = contentRef.current;
+      if (editorRef.current) {
+        try {
+          // 确保使用编辑器当前内容，而不是可能过期的 contentRef
+          currentContent = editorRef.current.getValue();
+          contentRef.current = currentContent; // 更新 contentRef
+          console.log('提交前获取编辑器当前内容:', currentContent);
+        } catch (e) {
+          console.error('获取编辑器当前内容时出错:', e);
+        }
       }
-
-      const status = values.status;
       
-      // 检测已删除的图片
+      // 从编辑器中获取内容引用
       const removedImageIds: string[] = [];
       
       // 只有在帖子有图片时才进行检测
       if (post?.images && post.images.length > 0) {
-        console.log('检测已删除的图片...');
+        console.log('检测已删除的图片和文件...');
         
-        // 从编辑器的内容中提取图片URL
-        const content = contentRef.current;
+        // 从编辑器的内容中提取所有文件URL（包括图片和非图片文件）
+        const content = currentContent;
         
         // 使用两种正则表达式，分别匹配Markdown和HTML中的图片
         const markdownImgRegex = /!\[.*?\]\(([^)]+)\)/g;
         const htmlImgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/g;
         
-        const imageUrls = new Set<string>();
+        // 匹配所有Markdown链接，用于非图片文件
+        const markdownLinkRegex = /\[(.*?)\]\(([^)]+)\)/g;
+        
+        // 存储所有文件URL（图片和非图片）
+        const fileUrls = new Set<string>();
         
         // 匹配Markdown格式的图片
         let mdMatch;
         while ((mdMatch = markdownImgRegex.exec(content)) !== null) {
-          if (mdMatch[1].includes('/api/posts/images/')) {
-            imageUrls.add(mdMatch[1]);
+          if (mdMatch[1].includes('/api/files/')) {
+            fileUrls.add(mdMatch[1]);
+            console.log('检测到图片URL:', mdMatch[1]);
           }
         }
         
         // 匹配HTML格式的图片
         let htmlMatch;
         while ((htmlMatch = htmlImgRegex.exec(content)) !== null) {
-          if (htmlMatch[1].includes('/api/posts/images/')) {
-            imageUrls.add(htmlMatch[1]);
+          if (htmlMatch[1].includes('/api/files/')) {
+            fileUrls.add(htmlMatch[1]);
+            console.log('检测到HTML图片URL:', htmlMatch[1]);
           }
         }
         
-        console.log('当前编辑器中的图片URL数量:', imageUrls.size);
+        // 匹配非图片文件链接
+        let linkMatch;
+        while ((linkMatch = markdownLinkRegex.exec(content)) !== null) {
+          // 检查是否是非图片文件链接（以[📄, [📝, [📦, [📎开头的链接）
+          const linkText = linkMatch[1] || '';
+          const url = linkMatch[2] || '';
+          
+          // 确保是文件链接且不是图片链接
+          if (url.includes('/api/files/') && 
+              (linkText.startsWith('📄') || 
+               linkText.startsWith('📝') || 
+               linkText.startsWith('📦') || 
+               linkText.startsWith('📎'))) {
+            fileUrls.add(url);
+            console.log('检测到非图片文件URL:', url);
+          }
+        }
         
-        // 检查哪些图片已经不在编辑器内容中
+        console.log('当前编辑器中的所有文件URL数量:', fileUrls.size);
+        
+        // 检查哪些文件已经不在编辑器内容中
+        const deletedFiles: Array<{id: string, url: string, filename: string, type: string}> = [];
         post.images.forEach(image => {
-          if (!Array.from(imageUrls).some(url => url === image.url)) {
-            // 这个图片URL不在当前编辑器内容中，说明被删除了
+          // 判断是否为图片类型
+          const isImageType = image.type.startsWith('image/');
+          
+          if (!Array.from(fileUrls).some(url => url === image.url)) {
+            // 这个文件URL不在当前编辑器内容中，说明被删除了
             removedImageIds.push(image.id);
-            console.log('检测到删除的图片:', image.url);
+            deletedFiles.push(image);
+            console.log(`检测到删除的${isImageType ? '图片' : '文件'}: ${image.url}`);
           }
         });
         
-        console.log('检测到需要删除的图片数量:', removedImageIds.length);
+        console.log('检测到需要删除的文件数量:', removedImageIds.length);
+        
+        // 主动尝试删除MinIO中的文件
+        if (deletedFiles.length > 0) {
+          try {
+            // 为每个被删除的文件调用删除API
+            await Promise.all(deletedFiles.map(async (file) => {
+              try {
+                const deleteResponse = await fetch(`/api/files/delete`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    filename: file.filename,
+                    fileId: file.id
+                  }),
+                });
+                
+                if (deleteResponse.ok) {
+                  console.log(`成功请求删除文件: ${file.filename}`);
+                } else {
+                  console.error(`删除文件请求失败: ${file.filename}`, await deleteResponse.text());
+                }
+              } catch (deleteError) {
+                console.error(`删除文件请求出错: ${file.filename}`, deleteError);
+              }
+            }));
+          } catch (error) {
+            console.error('处理文件删除时出错:', error);
+          }
+        }
+      }
+
+      // 关联临时文件到帖子
+      const content = currentContent;
+      
+      // 匹配所有Markdown链接
+      const allLinksRegex = /\[(.*?)\]\(([^)]+)\)/g;
+      
+      const fileUrls: string[] = [];
+      let linkMatch;
+      
+      while ((linkMatch = allLinksRegex.exec(content)) !== null) {
+        const linkText = linkMatch[1] || '';
+        const url = linkMatch[2] || '';
+        
+        // 检查是否是API文件链接，并且不是图片链接
+        // 图片链接格式为![...](url)，而文件链接格式为[...](url)
+        if (url && url.includes('/api/files/') && !content.includes(`![${linkText}](${url})`)) {
+          fileUrls.push(url);
+        }
+      }
+      
+      // 检查文件URL中不在postImages表中的文件，属于临时文件
+      if (fileUrls.length > 0) {
+        console.log('检测到非图片文件URL数量:', fileUrls.length);
+        
+        // 异步关联文件到帖子
+        const associateFiles = async () => {
+          for (const fileUrl of fileUrls) {
+            try {
+              // 从URL中提取信息
+              const urlParts = fileUrl.split('/');
+              const filename = urlParts.pop() || '';
+              const category = urlParts.pop() || 'other';
+              const userId = urlParts.pop() || '';
+              
+              // 构造完整路径
+              const tempPath = `users/${userId}/temp/${category}s/${filename}`;
+              
+              // 检查文件是否已经关联到帖子 - 通过URL匹配
+              // 这里使用严格匹配，确保相同URL的文件不会重复关联
+              const existingImage = post?.images?.find(img => img.url === fileUrl);
+              
+              // 如果已经有关联记录，跳过此文件
+              if (existingImage) {
+                console.log('文件已关联到帖子，跳过:', fileUrl);
+                continue;
+              }
+              
+              // 检查相同文件名是否已经有关联记录 - 通过文件名检查
+              // 提取文件名部分进行比较，这是额外的检查，防止文件路径不同但文件名相同的情况
+              const baseName = filename.split('/').pop() || '';
+              const similarImage = post?.images?.find(img => {
+                const imgFileName = img.filename.split('/').pop() || '';
+                return imgFileName === baseName;
+              });
+              
+              if (similarImage) {
+                console.log('发现相似文件已关联，跳过:', fileUrl);
+                continue;
+              }
+              
+              if (fileUrl.includes('/api/files/')) {
+                // 构造文件类型
+                let fileType = 'application/octet-stream';
+                const fileExt = filename.split('.').pop()?.toLowerCase() || '';
+                
+                if (fileExt === 'pdf') {
+                  fileType = 'application/pdf';
+                } else if (['doc', 'docx'].includes(fileExt)) {
+                  fileType = 'application/msword';
+                } else if (['xls', 'xlsx'].includes(fileExt)) {
+                  fileType = 'application/vnd.ms-excel';
+                } else if (['zip', 'rar'].includes(fileExt)) {
+                  fileType = fileExt === 'zip' ? 'application/zip' : 'application/x-rar-compressed';
+                }
+                
+                // 关联文件到帖子
+                const response = await fetch(`/api/posts/${id}/files`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    url: fileUrl,
+                    filename: tempPath,
+                    type: fileType,
+                    category
+                  }),
+                });
+                
+                if (response.ok) {
+                  console.log('已关联文件到帖子:', fileUrl);
+                } else {
+                  const errorData = await response.json();
+                  console.error('关联文件失败:', errorData);
+                }
+              }
+            } catch (error) {
+              console.error('关联文件失败:', error);
+              // 继续处理其他文件
+            }
+          }
+        };
+        
+        // 执行文件关联
+        try {
+          await associateFiles();
+          console.log('所有文件关联完成');
+        } catch (associateError) {
+          console.error('文件关联过程出错:', associateError);
+        }
       }
 
       // 准备提交的数据
@@ -396,13 +587,18 @@ export default function PostEditPage({ params }: PostEditPageProps) {
           .split(",")
           .map((tag) => tag.trim())
           .filter(Boolean),
-        content: contentRef.current,
+        content: currentContent,
         removedImageIds: removedImageIds,
       };
 
       console.log("准备提交的数据:", postData);
+      
+      // 检查提交的内容是否包含文件链接
+      const fileLinksRegex = /\[📄|\[📝|\[📦|\[📎/g;
+      const hasFileLinks = fileLinksRegex.test(currentContent);
+      console.log('内容中是否包含文件链接:', hasFileLinks);
 
-      // 发送请求更新帖子
+      // 发送更新帖子请求
       const response = await fetch(`/api/posts/${id}`, {
         method: "PUT",
         headers: {
@@ -411,35 +607,26 @@ export default function PostEditPage({ params }: PostEditPageProps) {
         body: JSON.stringify(postData),
       });
 
-      console.log("服务器响应状态:", response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("服务器错误响应:", errorText);
-        throw new Error(status === "draft" ? "保存草稿失败" : "更新帖子失败");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "更新帖子失败");
       }
 
-      // 成功响应
-      await response.json(); // 读取响应体但不需要使用
-
+      // 显示成功消息
       toast({
-        title: "成功！",
-        description: status === "draft"
-          ? `《${values.title}》已保存为草稿。`
-          : `《${values.title}》已成功发布。`,
-        action: <ToastAction altText="close">关闭</ToastAction>,
+        title: "帖子已更新",
+        description: "您的帖子已成功更新",
       });
 
-      // 根据状态跳转到不同页面和标签
-      router.push(`/user/posts?tab=${status}`);
+      // 跳转到帖子详情页
+      const updatedPost = await response.json();
+      router.push(`/forum/post/${updatedPost.id}`);
     } catch (error) {
-      console.error("更新帖子出错:", error);
+      console.error("更新帖子失败:", error);
       toast({
-        title: "失败！",
-        description:
-          error instanceof Error ? error.message : "更新帖子失败，请重试",
+        title: "更新失败",
+        description: "更新帖子时出错，请重试",
         variant: "destructive",
-        action: <ToastAction altText="close">关闭</ToastAction>,
       });
     } finally {
       setIsLoading(false);
@@ -550,7 +737,7 @@ export default function PostEditPage({ params }: PostEditPageProps) {
                 <FormField
                   control={form.control}
                   name="tags"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem className="flex flex-col">
                       <FormLabel className="mb-2">标签</FormLabel>
                       <FormControl>

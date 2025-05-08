@@ -51,7 +51,7 @@ let lockTimeoutId: NodeJS.Timeout | null = null;
 
 // 防止循环刷新的计数器
 let refreshCounter = 0;
-const MAX_REFRESH_COUNT = 3; // 最大刷新次数
+const MAX_REFRESH_COUNT = 10; // 增加最大刷新次数，防止提前终止正常刷新
 
 export default function HandlePermissionSync() {
   const { data: session, status, update } = useSession();
@@ -131,8 +131,9 @@ export default function HandlePermissionSync() {
     if (!mountedRef.current) {
       mountedRef.current = true;
       
-      // 如果已达到最大刷新次数，重置计数器但不执行同步
+      // 如果已达到最大刷新次数，重置计数器并直接终止执行
       if (refreshCounter >= MAX_REFRESH_COUNT) {
+        console.log(`达到最大刷新次数(${MAX_REFRESH_COUNT})，强制冷却`);
         refreshCounter = 0; // 重置计数器，下次再试
         localStorage.setItem('refresh_cooldown', 'true');
         return;
@@ -146,17 +147,30 @@ export default function HandlePermissionSync() {
         return;
       }
       
-      // 彻底重置权限同步状态和所有缓存
+      // 彻底重置权限同步状态和所有缓存 - 只在必要时执行
       const forceReset = () => {
         console.log("彻底重置所有权限缓存和同步状态");
         
         try {
+          // 检查上次重置时间，防止频繁重置
+          const lastResetTime = localStorage.getItem('last_reset_timestamp');
+          const now = Date.now();
+          
+          // 如果上次重置时间在5秒以内，跳过本次重置
+          if (lastResetTime && (now - parseInt(lastResetTime)) < 5000) {
+            console.log("上次重置时间太近，跳过本次重置");
+            return;
+          }
+          
+          // 记录本次重置时间
+          localStorage.setItem('last_reset_timestamp', now.toString());
+          
           // 清除所有本地权限缓存
           localStorage.removeItem('cached_permissions');
           localStorage.removeItem('cached_permissions_timestamp');
           
-          // 清除所有会话存储
-          sessionStorage.clear();
+          // 清除会话存储中的权限刷新标记
+          sessionStorage.removeItem('force_permission_refresh');
           
           // 重置全局缓存
           resetGlobalPermissionsCache();
@@ -170,13 +184,13 @@ export default function HandlePermissionSync() {
           
           // 设置标记，通知需要强制从数据库刷新
           sessionStorage.setItem('force_permission_refresh', 'true');
-          sessionStorage.setItem('force_reset_timestamp', Date.now().toString());
+          sessionStorage.setItem('force_reset_timestamp', now.toString());
         } catch (error) {
           console.error("重置权限缓存错误:", error);
         }
       };
       
-      // 每次组件挂载时强制重置
+      // 每次组件挂载时执行重置
       forceReset();
     }
     
