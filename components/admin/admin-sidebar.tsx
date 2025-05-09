@@ -19,6 +19,7 @@ import {
   Tag,
   UserCheck,
   FileSymlink,
+  KeyRound,
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -81,6 +82,12 @@ export function AdminSidebar() {
       title: "用户角色",
       href: "/admin/user-roles",
       icon: UserCheck,
+      permission: "admin_access", // 简化为只检查admin_access权限
+    },
+    {
+      title: "月度密钥管理",
+      href: "/admin/monthly-keys",
+      icon: KeyRound,
       permission: "admin_access", // 简化为只检查admin_access权限
     },
     {
@@ -217,6 +224,16 @@ export function AdminSidebar() {
                   label="用户角色"
                   href="/admin/user-roles"
                   isActive={pathname.startsWith("/admin/user-roles")}
+                />
+              )}
+              
+              {/* 月度密钥管理 */}
+              {menuWithPermissionCheck.find(i => i.href === "/admin/monthly-keys")?.hasPermission && (
+                <SidebarItem
+                  icon={<KeyRound size={20} />}
+                  label="月度密钥管理"
+                  href="/admin/monthly-keys"
+                  isActive={pathname.startsWith("/admin/monthly-keys")}
                 />
               )}
             </div>

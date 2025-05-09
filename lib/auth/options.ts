@@ -18,6 +18,7 @@ declare module "next-auth" {
         }
       }[];
       permissions?: string[]; // 添加permissions字段
+      monthlyKeyVerified?: boolean; // 添加月度密钥验证状态
     } & DefaultSession["user"]
   }
   
@@ -31,6 +32,7 @@ declare module "next-auth" {
       }
     }[];
     permissions?: string[]; // 添加permissions字段
+    monthlyKeyVerified?: boolean; // 添加月度密钥验证状态
   }
 }
 
@@ -120,11 +122,35 @@ export const authOptions: NextAuthOptions = {
                 include: {
                   role: true
                 }
-              }
+              },
+              monthlyKeyAuth: true // 添加月度密钥认证信息
             }
           });
           
           console.log(`[JWT回调] 用户ID: ${user.id}, 找到用户: ${!!userData}`);
+          
+          // 检查月度密钥验证状态
+          if (userData?.monthlyKeyAuth) {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+            
+            // 检查上次验证时间是否在当月
+            const authDate = userData.monthlyKeyAuth.lastVerifiedAt;
+            const authMonth = authDate.getMonth() + 1;
+            const authYear = authDate.getFullYear();
+            
+            // 设置月度密钥验证状态
+            const isValidKey = (authMonth === currentMonth && 
+                               authYear === currentYear && 
+                               userData.monthlyKeyAuth.isValid);
+            
+            token.monthlyKeyVerified = isValidKey;
+            console.log(`[JWT回调] 月度密钥验证状态: ${isValidKey}`);
+          } else {
+            token.monthlyKeyVerified = false;
+            console.log(`[JWT回调] 用户未进行月度密钥验证`);
+          }
           
           if (userData && userData.userRoles && userData.userRoles.length > 0) {
             console.log(`[JWT回调] 用户角色数量: ${userData.userRoles.length}`);
@@ -170,6 +196,7 @@ export const authOptions: NextAuthOptions = {
           console.error("[JWT回调] 获取用户角色时出错:", error);
           token.roles = [];
           token.permissions = [];
+          token.monthlyKeyVerified = false;
         }
       } else if (trigger === 'update' && session) {
         // 处理会话更新
@@ -185,6 +212,12 @@ export const authOptions: NextAuthOptions = {
           console.log("[JWT回调] 从session获取新的permissions", session.permissions?.length);
           token.permissions = session.permissions;
         }
+        
+        // 更新月度密钥验证状态
+        if (session.monthlyKeyVerified !== undefined) {
+          console.log(`[JWT回调] 从session更新月度密钥验证状态: ${session.monthlyKeyVerified}`);
+          token.monthlyKeyVerified = session.monthlyKeyVerified;
+        }
       }
       
       return token;
@@ -192,6 +225,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session?.user) {
         session.user.id = token.id as string;
+        
+        // 添加月度密钥验证状态到session
+        session.user.monthlyKeyVerified = token.monthlyKeyVerified || false;
         
         // 添加角色信息到session
         if (token.roles) {

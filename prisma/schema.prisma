@@ -29,6 +29,7 @@ model User {
   sessions      Session[]
   userRoles     UserRole[] // 用户角色关联
   adminLogs     AdminLog[] // 管理员操作日志
+  monthlyKeyAuth MonthlyKeyAuth? // 用户的月度密钥认证
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   isActive      Boolean   @default(true) // 用户是否处于激活状态
@@ -242,4 +243,20 @@ model Notification {
 
   @@index([userId])
   @@index([read])
+}
+
+// 月度密钥认证表
+model MonthlyKeyAuth {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key             String   // 当前有效的月度密钥
+  lastVerifiedAt  DateTime // 上次验证时间
+  isValid         Boolean  @default(true) // 验证是否有效
+  attempts        Int      @default(0) // 尝试次数
+  lockedUntil     DateTime? // 锁定截止时间
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
 }

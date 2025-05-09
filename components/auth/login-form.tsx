@@ -89,6 +89,9 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       const success = await login(data.email, data.password);
       if (success) {
         form.reset();
+        
+        // 登录成功后直接调用回调，不直接检查月度密钥状态
+        // 让全局组件和中间件处理密钥验证
         onSuccess?.();
       }
     } catch (err) {

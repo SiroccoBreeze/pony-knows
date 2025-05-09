@@ -28,6 +28,13 @@ async function main() {
         group: "system",
         label: "维护模式",
         type: "boolean"
+      },
+      {
+        key: "monthly_key_max_attempts",
+        value: "3",
+        group: "security",
+        label: "月度密钥最大尝试次数",
+        type: "number"
       }
     ];
     

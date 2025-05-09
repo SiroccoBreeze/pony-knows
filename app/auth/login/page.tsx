@@ -11,18 +11,26 @@ import { ArrowLeft } from "lucide-react";
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/';
+  const encodedCallbackUrl = searchParams.get('callbackUrl') || '/';
+  // 解码callbackUrl，避免重复编码导致的问题
+  const callbackUrl = encodedCallbackUrl.startsWith('http')
+    ? decodeURIComponent(encodedCallbackUrl)
+    : encodedCallbackUrl;
   const { user } = useAuth();
   
   // 如果用户已登录，重定向到回调URL
   React.useEffect(() => {
     if (user) {
+      // 使用解码后的URL进行导航
+      console.log("用户已登录，重定向到:", callbackUrl);
       router.push(callbackUrl);
       router.refresh(); // 强制刷新页面以更新状态
     }
   }, [user, router, callbackUrl]);
 
   const handleLoginSuccess = () => {
+    // 使用解码后的URL进行导航
+    console.log("登录成功，重定向到:", callbackUrl);
     router.push(callbackUrl);
     router.refresh(); // 强制刷新页面以更新状态
   };

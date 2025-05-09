@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
   Home, 
@@ -9,7 +8,8 @@ import {
   Download, 
   FileText, 
   LayoutGrid, 
-  HelpCircle
+  HelpCircle,
+  KeyRound
 } from "lucide-react";
 import { UserPermission } from "@/lib/permissions";
 import { NavigationItem } from "./navigation-item";
@@ -38,6 +38,11 @@ const mainNavItems = [
     href: "/working-papers",
     icon: FileText,
     permission: UserPermission.ACCESS_WORKING_PAPERS,
+  },
+  {
+    title: "月度密钥",
+    href: "/user/monthly-key",
+    icon: KeyRound,
   },
   {
     title: "服务",
