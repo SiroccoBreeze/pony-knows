@@ -53,13 +53,45 @@ function isKeyExemptPath(path: string): boolean {
 // 检查用户的密钥验证状态（从cookie或令牌中）
 function hasValidMonthlyKeyFromSession(token: JWT): boolean {
   try {
-    // 1. 先检查令牌中是否包含月度密钥验证状态
+    // 详细记录token的内容，帮助调试
+    const tokenKeys = Object.keys(token).filter(k => k !== 'iat' && k !== 'exp' && k !== 'jti');
+    console.log(`[中间件] 检查用户 ${token.sub} 的密钥验证状态，token字段: ${tokenKeys.join(', ')}`);
+    
+    // 明确检查月度密钥验证标志
     if (token.monthlyKeyVerified === true) {
+      console.log(`[中间件] 用户 ${token.sub} 通过会话标记验证了月度密钥: true`);
       return true;
     }
     
-    // 2. 如果令牌中没有验证状态，返回false
-    // 这将导致重定向到登录页面，让用户在前端进行密钥验证
+    // 检查是否存在跳过验证标记的cookie
+    try {
+      // 使用cookie-parser解析请求中的cookie
+      const cookies = (token as any).cookies || {};
+      if (cookies.monthly_key_skipped === 'true') {
+        console.log(`[中间件] 用户 ${token.sub} 已跳过密钥验证，不再重定向`);
+        return true;
+      }
+    } catch (e) {
+      console.error("解析cookie失败:", e);
+    }
+    
+    // 如果当前用户有管理员权限，自动认为验证通过
+    const userRoles = (token as any).roles || [];
+    const permissions: string[] = [];
+    
+    userRoles.forEach((role: any) => {
+      if (role.role?.permissions) {
+        permissions.push(...role.role.permissions);
+      }
+    });
+    
+    if (permissions.includes('admin_access')) {
+      console.log(`[中间件] 用户 ${token.sub} 具有管理员权限，自动验证通过`);
+      return true;
+    }
+    
+    // 如果token中没有验证状态，返回false
+    console.log(`[中间件] 用户 ${token.sub} 未通过会话标记验证月度密钥 (验证状态: ${token.monthlyKeyVerified})`);
     return false;
   } catch (error) {
     console.error("检查密钥状态错误:", error);
@@ -120,6 +152,15 @@ export async function middleware(request: NextRequest) {
     
     // 用户已登录，需要检查月度密钥状态（除了豁免路径）
     if (token && !isKeyExemptPath(pathname)) {
+      // 先检查系统是否启用了月度密钥验证功能
+      const enableMonthlyKey = await getSystemParameterWithDefault('enable_monthly_key', 'true');
+      
+      // 如果禁用了月度密钥验证功能，直接放行
+      if (enableMonthlyKey !== 'true') {
+        console.log(`[中间件] 月度密钥验证功能已禁用，跳过验证`);
+        return NextResponse.next();
+      }
+      
       // 先检查用户是否是管理员，管理员账户也需要验证密钥
       const userRoles = (token as { roles?: Role[] }).roles || [];
       const permissions: string[] = [];
@@ -140,13 +181,40 @@ export async function middleware(request: NextRequest) {
       // 如果不是管理员路由，并且没有有效密钥，重定向到登录/密钥验证页面
       if (!isAdminRoute && !hasValidKey) {
         console.log(`[中间件] 用户未验证月度密钥，重定向到密钥验证: ${token.sub}`);
-        // 重定向到登录页，它会显示密钥验证对话框
         // 保存原始请求的完整URL作为回调
         const originalUrl = request.url;
+        
         // 检查是否已经是登录页面，防止循环重定向
         if (pathname.startsWith('/auth/login')) {
           console.log('[中间件] 已经在登录页面，防止循环重定向');
           return NextResponse.next();
+        }
+        
+        // 检查URL是否包含needKey参数，如果有则表示已经在验证流程中
+        const url = new URL(request.url);
+        if (url.searchParams.get('needKey') === 'true') {
+          console.log('[中间件] 检测到needKey参数，避免重复重定向');
+          return NextResponse.next();
+        }
+        
+        // 检查是否有跳过验证的cookie
+        const skippedCookie = request.cookies.get('monthly_key_verification_skipped');
+        if (skippedCookie?.value === 'true') {
+          console.log('[中间件] 检测到跳过验证标记，不进行重定向');
+          
+          // 检查当前请求是否为API请求或登录相关页面
+          const isApiOrAuthRoute = pathname.startsWith('/api/') || 
+                                  pathname.startsWith('/auth/') || 
+                                  pathname === '/';
+          
+          if (isApiOrAuthRoute) {
+            console.log('[中间件] 允许访问API或登录相关页面');
+            return NextResponse.next();
+          }
+          
+          // 对于其他受保护的路由，重定向到登录页面
+          console.log('[中间件] 用户已跳过验证，重定向到登录页面');
+          return NextResponse.redirect(new URL('/auth/login', request.url));
         }
         
         // 检查回调URL是否安全

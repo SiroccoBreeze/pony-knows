@@ -146,7 +146,13 @@ export const authOptions: NextAuthOptions = {
                                userData.monthlyKeyAuth.isValid);
             
             token.monthlyKeyVerified = isValidKey;
-            console.log(`[JWT回调] 月度密钥验证状态: ${isValidKey}`);
+            console.log(`[JWT回调] 月度密钥验证状态: ${isValidKey}, 详情: ${JSON.stringify({
+              authMonth,
+              currentMonth,
+              authYear,
+              currentYear,
+              isValid: userData.monthlyKeyAuth.isValid
+            })}`);
           } else {
             token.monthlyKeyVerified = false;
             console.log(`[JWT回调] 用户未进行月度密钥验证`);
@@ -205,18 +211,25 @@ export const authOptions: NextAuthOptions = {
         // 如果是update操作并且session中包含roles和permissions，则更新token
         if (session.roles) {
           console.log("[JWT回调] 从session获取新的roles", session.roles?.length);
-          token.roles = session.roles;
+          (token as any).roles = session.roles;
         }
         
         if (session.permissions) {
           console.log("[JWT回调] 从session获取新的permissions", session.permissions?.length);
-          token.permissions = session.permissions;
+          (token as any).permissions = session.permissions;
         }
         
-        // 更新月度密钥验证状态
-        if (session.monthlyKeyVerified !== undefined) {
-          console.log(`[JWT回调] 从session更新月度密钥验证状态: ${session.monthlyKeyVerified}`);
-          token.monthlyKeyVerified = session.monthlyKeyVerified;
+        // 更新月度密钥验证状态 - 优先级更高，单独处理
+        if (session.user?.monthlyKeyVerified !== undefined) {
+          const oldValue = ((token as any).monthlyKeyVerified as boolean) || false;
+          const newValue = !!session.user.monthlyKeyVerified;
+          (token as any).monthlyKeyVerified = newValue;
+          console.log(`[JWT回调] 从session更新月度密钥验证状态: ${oldValue} -> ${newValue}`);
+          
+          // 如果是设置为已验证，记录更多日志以便跟踪
+          if (newValue === true && oldValue !== true) {
+            console.log(`[JWT回调] 用户 ${token.id} 的月度密钥验证状态已更新为已验证`);
+          }
         }
       }
       
@@ -228,6 +241,7 @@ export const authOptions: NextAuthOptions = {
         
         // 添加月度密钥验证状态到session
         session.user.monthlyKeyVerified = token.monthlyKeyVerified || false;
+        console.log(`[Session回调] 添加月度密钥验证状态到会话: ${session.user.monthlyKeyVerified}`);
         
         // 添加角色信息到session
         if (token.roles) {

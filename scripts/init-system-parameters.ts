@@ -35,6 +35,13 @@ async function main() {
         group: "security",
         label: "月度密钥最大尝试次数",
         type: "number"
+      },
+      {
+        key: "enable_monthly_key",
+        value: "true", 
+        group: "security",
+        label: "启用月度密钥验证",
+        type: "boolean"
       }
     ];
     

@@ -23,16 +23,76 @@ export default function LoginPage() {
     if (user) {
       // 使用解码后的URL进行导航
       console.log("用户已登录，重定向到:", callbackUrl);
-      router.push(callbackUrl);
-      router.refresh(); // 强制刷新页面以更新状态
+      
+      // 检查URL是否有needKey参数
+      const needKey = searchParams.get('needKey');
+      
+      // 详细记录用户对象，帮助调试
+      console.log("当前用户状态:", {
+        id: (user as any).id,
+        name: (user as any).name,
+        monthlyKeyVerified: (user as any).monthlyKeyVerified
+      });
+      
+      // 如果有needKey参数，中间件可能将用户重定向到此页面进行密钥验证
+      // 在这种情况下不自动跳转，让MonthlyKeyAuth组件处理验证流程
+      if (needKey === 'true') {
+        console.log("检测到needKey参数，等待密钥验证...");
+        
+        // 检查是否有跳过验证的cookie
+        const getCookieValue = (name: string) => {
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+          return match ? match[2] : '';
+        };
+        
+        const skippedVerification = getCookieValue('monthly_key_verification_skipped');
+        
+        if (skippedVerification === 'true') {
+          console.log("检测到用户已跳过密钥验证，执行登出操作");
+          
+          // 页面加载时检测到跳过验证标记，执行登出操作
+          setTimeout(() => {
+            // 清除会话并重定向到登录页，而不是首页
+            console.log("正在执行自动登出...");
+            fetch('/api/auth/signout', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ redirect: false })
+            }).then(() => {
+              // 登出后刷新页面
+              window.location.reload();
+            });
+          }, 100);
+          return;
+        }
+        
+        // 检查用户会话中是否已有monthlyKeyVerified标记
+        if ((user as any).monthlyKeyVerified === true) {
+          console.log("用户已完成月度密钥验证，正在跳转...");
+          // 使用足够的延迟确保DOM已更新
+          setTimeout(() => {
+            window.location.replace(callbackUrl);
+          }, 500);
+          return;
+        }
+        
+        return;
+      }
+      
+      // 使用window.location.replace替代router.push确保页面完全刷新
+      // 延迟执行以确保DOM已更新
+      setTimeout(() => {
+        window.location.replace(callbackUrl);
+      }, 500);
     }
-  }, [user, router, callbackUrl]);
+  }, [user, callbackUrl, searchParams]);
 
   const handleLoginSuccess = () => {
     // 使用解码后的URL进行导航
     console.log("登录成功，重定向到:", callbackUrl);
-    router.push(callbackUrl);
-    router.refresh(); // 强制刷新页面以更新状态
+    setTimeout(() => {
+      window.location.replace(callbackUrl);
+    }, 500);
   };
 
   return (
