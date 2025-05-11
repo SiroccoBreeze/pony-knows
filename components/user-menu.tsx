@@ -22,25 +22,59 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RestrictAccess } from "./ui/restrict-access";
 import { AdminPermission, UserPermission } from "@/lib/permissions";
+import { useEffect, useState } from "react";
+import { useUserStore } from "@/store";
 
 interface UserMenuProps {
   user: User;
 }
 
 export function UserMenu({ user }: UserMenuProps) {
+  const { updateUser } = useUserStore();
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(user.image || null);
+  
   // 获取用户首字母用于头像
   const getInitials = (name?: string | null) => {
     if (!name) return "U";
     return name.split(" ").map((n) => n[0]).join("");
   };
+  
+  // 当组件挂载或user变化时刷新用户信息
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        
+        if (data.user) {
+          updateUser(data.user);
+          if (data.user.image) {
+            setAvatarSrc(data.user.image + '?t=' + new Date().getTime()); // 添加时间戳防止缓存
+          }
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+      }
+    };
+    
+    fetchUserData();
+  }, [updateUser]);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button 
+          variant="ghost" 
+          className="relative h-8 w-8 rounded-full ring-2 ring-primary/10 hover:ring-primary/20 transition-all"
+        >
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.image || ""} alt={user.name || "User"} />
-            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+            {avatarSrc ? (
+              <AvatarImage src={avatarSrc} alt={user.name || "User"} className="object-cover" />
+            ) : (
+              <AvatarFallback className="bg-primary/10 text-primary">
+                {getInitials(user.name)}
+              </AvatarFallback>
+            )}
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

@@ -21,6 +21,7 @@ model User {
   emailVerified DateTime?
   password      String?
   image         String?
+  bio           String?   // 用户个人简介
   posts         Post[]
   comments      Comment[]
   messages      Message[] // 用户接收的消息

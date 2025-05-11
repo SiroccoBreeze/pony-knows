@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User as UserIcon, Settings, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import type { User } from "@/store/useUserStore";
 import Link from "next/link";
 import { RestrictAccess } from "@/components/ui/restrict-access";
 import { UserPermission } from "@/lib/permissions";
+import { useUserStore } from "@/store";
 
 interface UserMenuProps {
   user: User;
@@ -27,6 +28,8 @@ export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { logout } = useAuth();
+  const { updateUser } = useUserStore();
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(user?.image || null);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -38,12 +41,28 @@ export function UserMenu({ user }: UserMenuProps) {
     }
   };
 
+  useEffect(() => {
+    if (user?.image) {
+      setAvatarSrc(`${user.image}?t=${new Date().getTime()}`);
+    } else {
+      setAvatarSrc(null);
+    }
+  }, [user]);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
           <div className="flex items-center justify-center w-full h-full">
-            <UserIcon className="h-5 w-5" />
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt="User Avatar"
+                className="h-5 w-5 rounded-full"
+              />
+            ) : (
+              <UserIcon className="h-5 w-5" />
+            )}
           </div>
         </Button>
       </DropdownMenuTrigger>
