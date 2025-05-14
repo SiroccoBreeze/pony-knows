@@ -176,12 +176,12 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
   useEffect(() => {
     // 封装checkKeyStatus，避免依赖问题
     const checkStatus = () => {
-      if (user) {
+      if (user && session?.user?.id) {
         checkKeyStatus();
       }
     };
     
-    if (user) {
+    if (user && session?.user?.id) {
       // 初始加载时检查密钥状态
       checkStatus();
       
@@ -219,7 +219,7 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
       };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isLocked]);
+  }, [user, isLocked, session?.user?.id]);
 
   // 锁定验证功能
   const lockVerification = () => {

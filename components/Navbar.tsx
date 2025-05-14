@@ -16,6 +16,7 @@ import axios from "axios";
 import { MainNavigation } from "./main-navigation";
 import { NavigationItem } from "@/components/navigation-item";
 import { UserPermission } from "@/lib/permissions";
+import { useSession } from "next-auth/react";
 
 // 通知项目类型
 interface NotificationItem {
@@ -27,19 +28,24 @@ interface NotificationItem {
 
 const Navbar = () => {
   const { user, isLoggedIn } = useUserStore();
+  const { data: session, status } = useSession();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   const [registrationEnabled, setRegistrationEnabled] = useState(true); // 默认为启用
+  const hasFetchedParametersRef = React.useRef(false);
   
   // 确保组件只在客户端渲染后显示
   useEffect(() => {
     setMounted(true);
     
-    // 检查注册功能是否启用
+    // 检查注册功能是否启用，避免重复请求
+    if (hasFetchedParametersRef.current) return;
+    
     const checkRegistrationEnabled = async () => {
       try {
+        hasFetchedParametersRef.current = true;
         const response = await fetch("/api/system-parameters", {
           method: "POST",
           headers: {
@@ -61,58 +67,144 @@ const Navbar = () => {
     checkRegistrationEnabled();
   }, []);
   
+  // 获取未读消息数量 - 仅在用户登录时
+  useEffect(() => {
+    // 如果未挂载或用户未登录，跳过获取消息
+    if (!mounted || !isLoggedIn) {
+      setUnreadCount(0);
+      return;
+    }
+    
+    const fetchUnreadCount = async () => {
+      try {
+        // 检查会话状态和用户ID是否有效
+        const isValidSession = status === "authenticated" && !!session?.user?.id;
+        
+        // 确认用户已登录且用户对象存在再进行API调用
+        if (!isValidSession || !user || !user.id) {
+          console.log("[消息] 用户未完全登录或会话已过期，跳过获取未读消息");
+          return;
+        }
+        
+        const response = await axios.get('/api/notifications/unread-count');
+        if (response.data && typeof response.data.count === 'number') {
+          setUnreadCount(response.data.count);
+        }
+      } catch (error) {
+        console.error('获取未读消息数量失败:', error);
+        // 出错时不显示消息数量
+        setUnreadCount(0);
+      }
+    };
+
+    fetchUnreadCount();
+    
+    // 设置定时刷新
+    const intervalId = setInterval(() => {
+      // 再次检查会话状态是否有效
+      const isValidSession = status === "authenticated" && !!session?.user?.id;
+      if (isValidSession && isLoggedIn && user?.id) {
+        fetchUnreadCount();
+      }
+    }, 60000); // 每分钟刷新一次
+    
+    return () => clearInterval(intervalId);
+  }, [mounted, isLoggedIn, user, status, session]);
+  
   // 获取未读消息数
   useEffect(() => {
-    if (isLoggedIn && mounted) {
-      const fetchUnreadMessages = async () => {
-        try {
-          const response = await axios.get("/api/user/messages/unread");
-          if (response.data && response.data.unreadCount !== undefined) {
-            setUnreadCount(response.data.unreadCount);
-            setNotificationItems(response.data.recentMessages || []);
-          }
-        } catch (error) {
+    // 只有在用户已登录且组件挂载完成后才尝试获取消息
+    if (!isLoggedIn || !mounted) {
+      return;
+    }
+    
+    // 定义获取消息的函数
+    const fetchUnreadMessages = async () => {
+      try {
+        // 检查会话状态和用户ID是否有效
+        const isValidSession = status === "authenticated" && !!session?.user?.id;
+        
+        // 再次检查用户是否登录，防止session状态在API请求过程中发生变化
+        if (!isValidSession || !isLoggedIn) {
+          console.log("[消息] 会话已过期或用户未登录，跳过获取消息");
+          return;
+        }
+        
+        const response = await axios.get("/api/user/messages/unread");
+        if (response.data && response.data.unreadCount !== undefined) {
+          setUnreadCount(response.data.unreadCount);
+          setNotificationItems(response.data.recentMessages || []);
+        }
+      } catch (error: any) {
+        // 如果是401错误，不记录到控制台，因为这是未登录用户的预期行为
+        if (error?.response?.status !== 401) {
           console.error("获取未读消息数失败:", error);
         }
-      };
+      }
+    };
+    
+    // 立即获取一次
+    fetchUnreadMessages();
+    
+    // 设置定时器，每分钟刷新一次未读消息数
+    const intervalId = setInterval(() => {
+      // 检查会话状态是否有效
+      const isValidSession = status === "authenticated" && !!session?.user?.id;
+      if (isValidSession && isLoggedIn) {
+        fetchUnreadMessages();
+      }
+    }, 60000);
+    
+    // 监听localStorage变化，以便在消息状态更新时刷新
+    const handleStorageChange = (e: StorageEvent) => {
+      const isValidSession = status === "authenticated" && !!session?.user?.id;
+      if (e.key === 'messages-updated' && isLoggedIn && isValidSession) {
+        fetchUnreadMessages();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 也监听直接在当前窗口中的变化
+    const handleLocalUpdate = () => {
+      let localUpdateInterval: NodeJS.Timeout | null = null;
       
-      fetchUnreadMessages();
-      
-      // 设置定时器，每分钟刷新一次未读消息数
-      const intervalId = setInterval(fetchUnreadMessages, 60000);
-      
-      // 监听localStorage变化，以便在消息状态更新时刷新
-      const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === 'messages-updated') {
-          fetchUnreadMessages();
-        }
-      };
-      
-      window.addEventListener('storage', handleStorageChange);
-      
-      // 也监听直接在当前窗口中的变化
-      const handleLocalUpdate = () => {
-        const checkForUpdates = () => {
+      // 只有在用户登录时才检查更新
+      if (isLoggedIn) {
+        const checkForUpdates = async () => {
+          // 检查会话状态和用户ID是否有效
+          const isValidSession = status === "authenticated" && !!session?.user?.id;
+          
+          // 再次检查用户是否登录，防止session状态在检查过程中发生变化
+          if (!isValidSession || !isLoggedIn) {
+            return;
+          }
+          
           const lastUpdate = localStorage.getItem('messages-updated');
           if (lastUpdate && lastUpdate !== lastCheckedUpdate.current) {
             lastCheckedUpdate.current = lastUpdate;
-            fetchUnreadMessages();
+            await fetchUnreadMessages();
           }
         };
         
-        const localUpdateInterval = setInterval(checkForUpdates, 1000);
-        return () => clearInterval(localUpdateInterval);
-      };
-      
-      const localUpdateCleanup = handleLocalUpdate();
+        localUpdateInterval = setInterval(checkForUpdates, 1000);
+      }
       
       return () => {
-        clearInterval(intervalId);
-        window.removeEventListener('storage', handleStorageChange);
-        localUpdateCleanup();
+        if (localUpdateInterval) {
+          clearInterval(localUpdateInterval);
+        }
       };
-    }
-  }, [isLoggedIn, mounted]);
+    };
+    
+    const localUpdateCleanup = handleLocalUpdate();
+    
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('storage', handleStorageChange);
+      if (localUpdateCleanup) localUpdateCleanup();
+    };
+  }, [isLoggedIn, mounted, status, session]);
   
   // 用于跟踪最后检查的更新时间
   const lastCheckedUpdate = React.useRef<string | null>(null);
@@ -158,7 +250,9 @@ const Navbar = () => {
               <ThemeToggle />
               <ThemeToggleColor />
             </div>
-            {isLoggedIn && (
+            
+            {/* 消息通知按钮 - 仅在用户登录且会话有效时显示 */}
+            {mounted && isLoggedIn && status === "authenticated" && !!session?.user?.id && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative hover:bg-primary/10 rounded-full transition-colors">
@@ -203,10 +297,12 @@ const Navbar = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            
+            {/* 用户登录或登录按钮 */}
             {!mounted ? (
               // 加载状态 - 显示占位符
               (<div className="w-8 h-8"></div>)
-            ) : isLoggedIn ? (
+            ) : isLoggedIn && status === "authenticated" && !!session?.user?.id ? (
               <UserMenu user={user!} />
             ) : (
               <>

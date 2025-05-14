@@ -18,11 +18,26 @@ export async function GET(request: Request) {
     // 获取服务端会话
     const session = await getServerSession(authOptions);
     
-    // 如果没有会话，返回未授权状态
+    // 如果没有会话，返回未授权状态但包含空的权限数组
     if (!session) {
+      console.log(`[API] 权限请求 - 未登录用户`);
       return NextResponse.json(
-        { error: "未授权访问", authenticated: false },
-        { status: 401 }
+        { 
+          authenticated: false,
+          permissions: [],
+          roles: [],
+          hasAdminAccess: false,
+          refreshedAt: new Date().toISOString(),
+          message: "未登录用户，无需加载权限"
+        },
+        { 
+          status: 200, // 返回200而非401，避免客户端报错
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }
       );
     }
     
@@ -36,9 +51,15 @@ export async function GET(request: Request) {
 
     console.log(`[API] 权限请求 - 用户:${userId}, 强制刷新:${isForceRefresh}, 时间戳:${timestamp}`);
     
-    // 总是清除用户缓存，确保每次都从数据库获取最新数据
+    // 检查缓存
     const cacheKey = `auth_debug_${userId}`;
-    API_CACHE.delete(cacheKey);
+    if (!isForceRefresh && API_CACHE.has(cacheKey)) {
+      const cachedData = API_CACHE.get(cacheKey);
+      if (cachedData && (Date.now() - cachedData.timestamp) < 30000) { // 30秒缓存
+        console.log(`[API] 权限请求 - 使用缓存数据: ${userId}`);
+        return NextResponse.json(cachedData.data);
+      }
+    }
     
     // 直接从数据库查询用户的角色和权限
     const userData = await prisma.user.findUnique({
@@ -55,8 +76,14 @@ export async function GET(request: Request) {
     if (!userData) {
       console.error(`[API] 找不到用户数据, 用户ID: ${userId}`);
       return NextResponse.json(
-        { error: "找不到用户数据", authenticated: false },
-        { status: 404 }
+        { 
+          authenticated: false,
+          permissions: [],
+          roles: [],
+          hasAdminAccess: false,
+          error: "找不到用户数据"
+        },
+        { status: 200 }
       );
     }
     
@@ -102,18 +129,29 @@ export async function GET(request: Request) {
     // 返回调试信息，并设置响应头阻止缓存
     return NextResponse.json(responseData, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0',
-        'Surrogate-Control': 'no-store'
+        'Expires': '0'
       }
     });
     
   } catch (error) {
     console.error("权限调试API错误:", error);
     return NextResponse.json(
-      { error: "服务器错误", message: String(error) },
-      { status: 500 }
+      { 
+        error: "服务器错误", 
+        message: String(error),
+        authenticated: false,
+        permissions: [] 
+      },
+      { 
+        status: 200, // 返回200状态码，以避免客户端500错误
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }
     );
   }
 } 

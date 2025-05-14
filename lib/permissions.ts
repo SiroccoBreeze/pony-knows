@@ -9,6 +9,7 @@ export enum UserPermission {
   // 论坛权限
   VIEW_FORUM = "view_forum",                // 查看论坛内容
   CREATE_TOPIC = "create_topic",            // 创建主题帖
+  DELETE_COMMENT = "delete_comment",        // 删除评论权限
   
   // 服务与资源权限
   VIEW_SERVICES = "view_services",          // 查看服务页面

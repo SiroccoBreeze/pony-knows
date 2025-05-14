@@ -71,17 +71,20 @@ export function ServicesDropdown() {
       hasAnyServicePermission: false
     };
     
-    // 一次性检查所有权限
-    const hasServiceAccess = hasPermission(UserPermission.VIEW_SERVICES);
-    const hasDatabaseAccess = hasPermission(UserPermission.ACCESS_DATABASE);
-    const hasMinioAccess = hasPermission(UserPermission.ACCESS_MINIO);
-    const hasFileDownloadAccess = hasPermission(UserPermission.ACCESS_FILE_DOWNLOADS);
+    // 使用原始权限数组直接检查，避免双重检查可能导致的不一致
+    console.log("[ServicesDropdown] 权限检查时的原始权限列表:", permissions);
+    
+    // 直接从权限数组中检查
+    const hasServiceAccess = permissions.includes(UserPermission.VIEW_SERVICES);
+    const hasDatabaseAccess = permissions.includes(UserPermission.ACCESS_DATABASE);
+    const hasMinioAccess = permissions.includes(UserPermission.ACCESS_MINIO);
+    const hasFileDownloadAccess = permissions.includes(UserPermission.ACCESS_FILE_DOWNLOADS);
     
     // 只要有任何一种服务权限就显示菜单
     const hasAnyServicePermission = hasServiceAccess || hasDatabaseAccess || 
                                   hasMinioAccess || hasFileDownloadAccess;
     
-    console.log("[ServicesDropdown] 服务权限检查:", {
+    console.log("[ServicesDropdown] 服务权限检查(使用原始权限列表):", {
       hasServiceAccess,
       hasDatabaseAccess,
       hasMinioAccess,
@@ -98,6 +101,47 @@ export function ServicesDropdown() {
       hasFileDownloadAccess
     });
     
+    // 如果没有权限但理应有，尝试使用hasPermission作为后备方法
+    if (!hasAnyServicePermission) {
+      // 后备权限检查方法
+      const backupHasServiceAccess = hasPermission(UserPermission.VIEW_SERVICES);
+      const backupHasDatabaseAccess = hasPermission(UserPermission.ACCESS_DATABASE);
+      const backupHasMinioAccess = hasPermission(UserPermission.ACCESS_MINIO);
+      const backupHasFileDownloadAccess = hasPermission(UserPermission.ACCESS_FILE_DOWNLOADS);
+      
+      const backupHasAnyServicePermission = backupHasServiceAccess || backupHasDatabaseAccess || 
+                                           backupHasMinioAccess || backupHasFileDownloadAccess;
+      
+      console.log("[ServicesDropdown] 后备服务权限检查(使用hasPermission):", {
+        backupHasServiceAccess,
+        backupHasDatabaseAccess,
+        backupHasMinioAccess,
+        backupHasFileDownloadAccess,
+        backupHasAnyServicePermission
+      });
+      
+      // 如果后备检查有权限，使用后备结果
+      if (backupHasAnyServicePermission) {
+        console.log("[ServicesDropdown] 使用后备权限检查结果");
+        
+        // 更新权限状态
+        setServicePermissions({
+          hasServiceAccess: backupHasServiceAccess,
+          hasDatabaseAccess: backupHasDatabaseAccess,
+          hasMinioAccess: backupHasMinioAccess,
+          hasFileDownloadAccess: backupHasFileDownloadAccess
+        });
+        
+        return {
+          hasServiceAccess: backupHasServiceAccess,
+          hasDatabaseAccess: backupHasDatabaseAccess,
+          hasMinioAccess: backupHasMinioAccess,
+          hasFileDownloadAccess: backupHasFileDownloadAccess,
+          hasAnyServicePermission: backupHasAnyServicePermission
+        };
+      }
+    }
+    
     return {
       hasServiceAccess,
       hasDatabaseAccess,
@@ -105,7 +149,7 @@ export function ServicesDropdown() {
       hasFileDownloadAccess,
       hasAnyServicePermission
     };
-  }, [hasPermission, isLoading, permissions]); // 添加permissions作为依赖
+  }, [hasPermission, isLoading, permissions]); // 添加hasPermission和permissions作为依赖
   
   // 设置是否显示菜单
   useEffect(() => {

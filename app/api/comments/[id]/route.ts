@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
-import { Permission } from "@/lib/permissions";
+import { authOptions } from "@/lib/auth/options";
+import { UserPermission } from "@/lib/permissions";
 
 // 扩展 Session 类型
 interface ExtendedSession {
@@ -73,7 +73,7 @@ export async function DELETE(
     }
     
     // 检查权限
-    const hasDeletePermission = session.user.permissions?.includes(Permission.DELETE_COMMENT);
+    const hasDeletePermission = session.user.permissions?.includes(UserPermission.DELETE_COMMENT);
     if (!hasDeletePermission) {
       return NextResponse.json(
         { error: "没有删除评论的权限" },

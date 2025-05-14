@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth/options";
 import { AdminPermission } from "@/lib/permissions";
 
 const prisma = new PrismaClient();
@@ -19,6 +19,7 @@ interface ExtendedSession {
         permissions: string[];
       }
     }[];
+    permissions?: string[];
   };
 }
 
@@ -37,10 +38,27 @@ async function checkPermission(session: ExtendedSession | null, permission: stri
     
     // 管理员自动拥有所有权限
     if (permissions.includes(AdminPermission.ADMIN_ACCESS)) {
+      console.log(`[权限检查] 用户拥有管理员权限`);
+      return true;
+    }
+    
+    // 或者直接检查session中的permissions
+    if (session.user.permissions && session.user.permissions.includes(AdminPermission.ADMIN_ACCESS)) {
+      console.log(`[权限检查] 用户拥有管理员权限(来自session.permissions)`);
       return true;
     }
     
     return permissions.includes(permission);
+  }
+  
+  // 直接检查session.user.permissions
+  if (session.user.permissions) {
+    if (session.user.permissions.includes(AdminPermission.ADMIN_ACCESS)) {
+      console.log(`[权限检查] 用户拥有管理员权限(来自session.permissions)`);
+      return true;
+    }
+    
+    return session.user.permissions.includes(permission);
   }
   
   // 否则从数据库查询

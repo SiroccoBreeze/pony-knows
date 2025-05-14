@@ -4,17 +4,22 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { LogIn, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export function LoginRequired() {
   const pathname = usePathname();
   const encodedPath = encodeURIComponent(pathname);
   const [registrationEnabled, setRegistrationEnabled] = useState(true); // 默认为启用
+  const hasFetchedRef = useRef(false);
   
   // 检查注册功能是否启用
   useEffect(() => {
+    // 避免重复请求
+    if (hasFetchedRef.current) return;
+    
     const checkRegistrationEnabled = async () => {
       try {
+        hasFetchedRef.current = true;
         const response = await fetch("/api/system-parameters", {
           method: "POST",
           headers: {

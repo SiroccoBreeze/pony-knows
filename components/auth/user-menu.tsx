@@ -19,6 +19,7 @@ import Link from "next/link";
 import { RestrictAccess } from "@/components/ui/restrict-access";
 import { UserPermission } from "@/lib/permissions";
 import { useUserStore } from "@/store";
+import { useSession } from "next-auth/react";
 
 interface UserMenuProps {
   user: User;
@@ -30,6 +31,10 @@ export function UserMenu({ user }: UserMenuProps) {
   const { logout } = useAuth();
   const { updateUser } = useUserStore();
   const [avatarSrc, setAvatarSrc] = useState<string | null>(user?.image || null);
+  const { data: session, status } = useSession();
+  
+  // 检查会话状态是否有效
+  const isValidSession = status === "authenticated" && !!session?.user?.id;
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -42,12 +47,23 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   useEffect(() => {
+    // 会话失效时自动登出
+    if (!isValidSession && user.id) {
+      console.log("UserMenu - 检测到无效会话状态，执行登出操作");
+      handleLogout();
+    }
+    
     if (user?.image) {
       setAvatarSrc(`${user.image}?t=${new Date().getTime()}`);
     } else {
       setAvatarSrc(null);
     }
-  }, [user]);
+  }, [user, isValidSession]);
+
+  // 如果会话无效，不渲染用户菜单
+  if (!isValidSession) {
+    return null;
+  }
 
   return (
     <DropdownMenu>

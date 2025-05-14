@@ -5,6 +5,7 @@ import GithubProvider from "next-auth/providers/github";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { normalizePermissions } from "@/lib/permissions-util";
+import { JWT } from "next-auth/jwt";
 
 // 扩展 Session 类型
 declare module "next-auth" {
@@ -110,7 +111,20 @@ export const authOptions: NextAuthOptions = {
       // 记录触发JWT回调的原因
       console.log(`[JWT回调] 触发原因: ${trigger || 'initial'}`);
       
+      // 如果token没有有效的id，则视为无效会话
+      if (!token.id && !user) {
+        console.error("[JWT回调] 会话token无有效ID");
+        // 不能直接返回null，必须返回一个有效的JWT对象
+        return { ...token, invalidated: true };
+      }
+      
       if (user) {
+        // 用户信息必须包含有效ID
+        if (!user.id) {
+          console.error("[JWT回调] 用户对象缺少有效ID");
+          return { ...token, invalidated: true };
+        }
+        
         token.id = user.id;
         
         try {
@@ -126,6 +140,12 @@ export const authOptions: NextAuthOptions = {
               monthlyKeyAuth: true // 添加月度密钥认证信息
             }
           });
+          
+          // 验证用户是否存在于数据库中
+          if (!userData) {
+            console.error(`[JWT回调] 用户ID ${user.id} 在数据库中不存在`);
+            return { ...token, invalidated: true };
+          }
           
           console.log(`[JWT回调] 用户ID: ${user.id}, 找到用户: ${!!userData}`);
           
@@ -189,10 +209,10 @@ export const authOptions: NextAuthOptions = {
             }
             
             // 保存去重的权限数组到token
-            token.permissions = [...new Set(allPermissions)];
+            token.permissions = [...new Set(allPermissions)] as string[];
             
-            console.log(`[JWT回调] 用户权限: ${token.permissions.join(', ')}`);
-            console.log(`[JWT回调] 是否有管理员权限: ${token.permissions.includes('admin_access')}`);
+            console.log(`[JWT回调] 用户权限: ${(token.permissions as string[])?.join(', ') || '无'}`);
+            console.log(`[JWT回调] 是否有管理员权限: ${(token.permissions as string[])?.includes('admin_access') || false}`);
           } else {
             console.log("[JWT回调] 用户没有角色或权限");
             token.roles = [];
@@ -208,22 +228,45 @@ export const authOptions: NextAuthOptions = {
         // 处理会话更新
         console.log("[JWT回调] 处理会话更新");
         
+        // 如果是update操作并且token没有有效ID，拒绝更新
+        if (!token.id) {
+          console.error("[JWT回调] 更新无效会话token");
+          return { ...token, invalidated: true };
+        }
+        
+        // 验证用户是否仍然存在于数据库中
+        try {
+          const userExists = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { id: true }
+          });
+          
+          if (!userExists) {
+            console.error(`[JWT回调] 会话更新时用户ID ${token.id} 在数据库中不存在`);
+            return { ...token, invalidated: true };
+          }
+        } catch (error) {
+          console.error("[JWT回调] 验证用户存在时出错:", error);
+          // 即使出错，我们也返回token而不是null，保留invalidated标记
+          return { ...token, invalidated: true };
+        }
+        
         // 如果是update操作并且session中包含roles和permissions，则更新token
         if (session.roles) {
           console.log("[JWT回调] 从session获取新的roles", session.roles?.length);
-          (token as any).roles = session.roles;
+          token.roles = session.roles;
         }
         
         if (session.permissions) {
           console.log("[JWT回调] 从session获取新的permissions", session.permissions?.length);
-          (token as any).permissions = session.permissions;
+          token.permissions = session.permissions;
         }
         
         // 更新月度密钥验证状态 - 优先级更高，单独处理
         if (session.user?.monthlyKeyVerified !== undefined) {
-          const oldValue = ((token as any).monthlyKeyVerified as boolean) || false;
+          const oldValue = token.monthlyKeyVerified || false;
           const newValue = !!session.user.monthlyKeyVerified;
-          (token as any).monthlyKeyVerified = newValue;
+          token.monthlyKeyVerified = newValue;
           console.log(`[JWT回调] 从session更新月度密钥验证状态: ${oldValue} -> ${newValue}`);
           
           // 如果是设置为已验证，记录更多日志以便跟踪
@@ -231,16 +274,60 @@ export const authOptions: NextAuthOptions = {
             console.log(`[JWT回调] 用户 ${token.id} 的月度密钥验证状态已更新为已验证`);
           }
         }
+      } else {
+        // 不是新登录也不是更新，检查token的有效性
+        if (!token.id) {
+          console.error("[JWT回调] token缺少ID");
+          return { ...token, invalidated: true };
+        }
+        
+        // 每次会话刷新时随机抽样验证用户是否仍存在于数据库中 (1/10的概率)
+        if (Math.random() < 0.1) {
+          try {
+            const userExists = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: { id: true }
+            });
+            
+            if (!userExists) {
+              console.error(`[JWT回调] 会话刷新时用户ID ${token.id} 在数据库中不存在`);
+              return { ...token, invalidated: true };
+            }
+          } catch (error) {
+            // 查询错误不应该终止会话，只记录错误
+            console.error("[JWT回调] 随机验证用户存在时出错:", error);
+          }
+        }
       }
       
       return token;
     },
     async session({ session, token }) {
+      // 如果token标记为无效，则尝试清理会话
+      if (token.invalidated) {
+        console.error("[Session回调] 接收到已标记为无效的token");
+        // 我们不能直接返回null，但可以清空会话信息
+        return {
+          ...session,
+          expires: new Date(0).toISOString(), // 立即过期
+          user: { ...session.user, id: '' } // 清空用户ID
+        };
+      }
+      
+      if (!token.id) {
+        console.error("[Session回调] token缺少ID");
+        return {
+          ...session,
+          expires: new Date(0).toISOString(), // 立即过期
+          user: { ...session.user, id: '' } // 清空用户ID
+        };
+      }
+      
       if (session?.user) {
         session.user.id = token.id as string;
         
         // 添加月度密钥验证状态到session
-        session.user.monthlyKeyVerified = token.monthlyKeyVerified || false;
+        session.user.monthlyKeyVerified = !!token.monthlyKeyVerified;
         console.log(`[Session回调] 添加月度密钥验证状态到会话: ${session.user.monthlyKeyVerified}`);
         
         // 添加角色信息到session

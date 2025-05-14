@@ -15,7 +15,7 @@ interface Role {
 }
 
 // 公开路由列表（不需要登录即可访问）
-const publicRoutes = ['/', '/auth/login', '/auth/register', '/api', '/_next', '/favicon.ico', '/images', '/not-found', '/404']
+const publicRoutes = ['/', '/auth/login', '/auth/register', '/api', '/api/auth/session', '/_next', '/favicon.ico', '/images', '/not-found', '/404']
 
 // 无需月度密钥验证的路径（即使用户已登录）
 const KEY_EXEMPT_PATHS = [

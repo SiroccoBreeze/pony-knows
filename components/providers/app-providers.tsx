@@ -2,7 +2,6 @@
 
 import { ReactNode } from "react";
 import { LoadingProvider } from "./loading-provider";
-import { PermissionsLoadingProvider } from "./permissions-loading-provider";
 import { LoaderProvider } from "@/contexts/loader-context";
 
 interface AppProvidersProps {
@@ -19,10 +18,8 @@ export function AppProviders({ children }: AppProvidersProps) {
     <LoaderProvider>
       {/* 全局加载状态提供者 */}
       <LoadingProvider>
-        {/* 权限加载提供者 */}
-        <PermissionsLoadingProvider>
-          {children}
-        </PermissionsLoadingProvider>
+        {/* 权限加载已移至layout.tsx */}
+        {children}
       </LoadingProvider>
     </LoaderProvider>
   );

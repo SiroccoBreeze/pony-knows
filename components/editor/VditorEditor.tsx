@@ -45,6 +45,7 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
     
     // 上传中的文件信息
     const [uploadingFiles, setUploadingFiles] = useState<{name: string, progress: number}[]>([]);
+    const hasLoadedSettingsRef = useRef(false);
 
     // 检查DOM是否已加载
     useEffect(() => {
@@ -53,8 +54,12 @@ const VditorEditor = forwardRef<VditorEditorRef, VditorEditorProps>(
 
     // 加载上传设置
     useEffect(() => {
+      // 避免重复请求上传设置
+      if (hasLoadedSettingsRef.current) return;
+      
       async function loadUploadSettings() {
         try {
+          hasLoadedSettingsRef.current = true;
           // 从API获取上传设置
           const response = await fetch('/api/system-parameters', {
             method: 'POST',

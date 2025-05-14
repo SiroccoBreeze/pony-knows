@@ -5,6 +5,12 @@ let parametersCache: Record<string, string> = {};
 let cacheTimestamp = 0;
 const CACHE_TTL = 60 * 1000; // 缓存有效期：1分钟
 
+// 浏览器端缓存
+// 在浏览器环境中，为避免频繁请求，使用内存缓存
+let browserCache: Record<string, string> = {};
+let browserCacheTimestamp = 0;
+const BROWSER_CACHE_TTL = 3 * 60 * 1000; // 浏览器缓存有效期：3分钟
+
 // 获取系统参数值的函数 - 仅用于服务器端API路由，不适用于中间件
 export async function getSystemParameterFromDb(key: string): Promise<string | null> {
   try {
@@ -44,6 +50,12 @@ export async function getSystemParameterWithDefaultFromDb(key: string, defaultVa
 export function clearParametersCache(): void {
   parametersCache = {};
   cacheTimestamp = 0;
+  
+  // 同时清除浏览器缓存
+  if (typeof window !== 'undefined') {
+    browserCache = {};
+    browserCacheTimestamp = 0;
+  }
 }
 
 // 以下函数用于Edge Runtime环境中（如中间件），但由于API调用限制，不建议在中间件中使用
@@ -60,6 +72,15 @@ function getBaseUrl() {
 // 获取系统参数值的函数，适用于客户端或API路由中
 export async function getSystemParameter(key: string): Promise<string | null> {
   try {
+    // 客户端缓存检查
+    if (typeof window !== 'undefined') {
+      const now = Date.now();
+      // 如果缓存有效且存在该键，直接返回缓存值
+      if (now - browserCacheTimestamp < BROWSER_CACHE_TTL && key in browserCache) {
+        return browserCache[key] || null;
+      }
+    }
+    
     // 构建API基础URL
     const baseUrl = getBaseUrl();
     
@@ -82,7 +103,15 @@ export async function getSystemParameter(key: string): Promise<string | null> {
     }
 
     const data = await response.json();
-    return data.value !== undefined ? data.value : null;
+    const value = data.value !== undefined ? data.value : null;
+    
+    // 更新浏览器缓存
+    if (typeof window !== 'undefined' && value !== null) {
+      browserCache[key] = value;
+      browserCacheTimestamp = Date.now();
+    }
+    
+    return value;
   } catch (error) {
     console.error(`获取系统参数 ${key} 失败:`, error);
     return null;

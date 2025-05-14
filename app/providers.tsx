@@ -22,9 +22,8 @@ export function Providers({ children }: ProvidersProps) {
       >
         <AuthProvider>
           <LoadingProvider>
-            <PermissionsLoadingProvider>
-              {children}
-            </PermissionsLoadingProvider>
+            {/* 权限加载提供者已移至其他位置 */}
+            {children}
           </LoadingProvider>
         </AuthProvider>
         <Toaster />

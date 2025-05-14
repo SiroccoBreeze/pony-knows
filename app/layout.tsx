@@ -12,6 +12,7 @@ import { LoadingOverlay } from "@/components/loading-overlay";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AppProviders } from "@/components/providers/app-providers";
 import { MonthlyKeyAuth } from "@/components/auth/monthly-key-auth";
+import { PermissionsLoadingProvider } from "@/components/providers/permissions-loading-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,7 +46,9 @@ export default function RootLayout({
             <Providers>
               <AppProviders>
                 <MonthlyKeyAuth />
-                <ClientLayout>{children}</ClientLayout>
+                <PermissionsLoadingProvider>
+                  <ClientLayout>{children}</ClientLayout>
+                </PermissionsLoadingProvider>
                 <HandlePermissionSync />
                 <Toaster />
               </AppProviders>

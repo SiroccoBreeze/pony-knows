@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   User, 
   FileText, 
@@ -16,6 +16,7 @@ import {
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useSession } from "next-auth/react";
 
 // 菜单项类型
 interface MenuItem {
@@ -26,33 +27,66 @@ interface MenuItem {
 }
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
+  // 如果未登录，重定向到登录页面
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/login?callbackUrl=" + encodeURIComponent(pathname));
+    }
+  }, [status, router, pathname]);
+  
   // 获取未读消息数
   useEffect(() => {
+    // 只有在用户已认证且有有效用户ID时才获取消息数
+    if (status !== "authenticated" || !session?.user?.id) {
+      return;
+    }
+    
     const fetchUnreadMessages = async () => {
       try {
+        // 再次检查会话有效性
+        if (status !== "authenticated" || !session?.user?.id) {
+          console.log("会话状态已变更，中止消息请求");
+          return;
+        }
+        
         const response = await axios.get("/api/user/messages/unread");
         if (response.data && response.data.unreadCount !== undefined) {
           setUnreadCount(response.data.unreadCount);
         }
-      } catch (error) {
-        console.error("获取未读消息数失败:", error);
+      } catch (error: any) {
+        // 只记录非401错误
+        if (error?.response?.status !== 401) {
+          console.error("获取未读消息数失败:", error);
+        }
       }
     };
     
     fetchUnreadMessages();
     
     // 设置定时器，每30秒刷新一次未读消息数
-    const intervalId = setInterval(fetchUnreadMessages, 30000);
+    const intervalId = setInterval(() => {
+      // 检查会话是否仍然有效
+      if (status === "authenticated" && session?.user?.id) {
+        fetchUnreadMessages();
+      }
+    }, 30000);
     
     // 监听localStorage变化，以便在消息状态更新时刷新
     const checkUpdateHandler = () => {
       let lastUpdate = '';
       
       const checkStorageUpdate = () => {
+        // 如果用户状态不是已认证或没有有效用户ID，不继续检查
+        if (status !== "authenticated" || !session?.user?.id) {
+          return;
+        }
+        
         const currentUpdate = localStorage.getItem('messages-updated');
         if (currentUpdate && currentUpdate !== lastUpdate) {
           lastUpdate = currentUpdate;
@@ -70,12 +104,28 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
       clearInterval(intervalId);
       storageCheckCleanup();
     };
-  }, []);
+  }, [status, session]);
   
   // 关闭移动菜单当路由改变时
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+  
+  // 如果会话正在加载或者未认证，显示加载状态
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <div className="container mx-auto py-4 px-4 sm:py-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="h-10 w-10 mx-auto mb-3 animate-spin rounded-full border-4 border-primary/30 border-t-primary"></div>
+            <p className="text-muted-foreground">
+              {status === "loading" ? "加载中..." : "正在重定向到登录页面..."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   // 菜单项配置
   const menuItems: MenuItem[] = [
