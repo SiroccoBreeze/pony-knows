@@ -77,7 +77,8 @@ function clearAuthCookies() {
     "__Host-next-auth.csrf-token",
     "next-auth.callback-url",
     "__Secure-next-auth.callback-url",
-    "__Host-next-auth.callback-url"
+    "__Host-next-auth.callback-url",
+    "auth_session_complete"  // 添加自定义的完整会话标记cookie
   ];
   
   const paths = ["/", "/api", "/auth"];
@@ -104,7 +105,12 @@ function clearAuthCookies() {
     });
   });
   
-  console.log("已清除所有认证相关cookie");
+  // 同时清除localStorage中的相关项
+  localStorage.removeItem('auth_session_complete');
+  localStorage.removeItem('monthly_key_status_cache');
+  localStorage.removeItem('monthly_key_status_timestamp');
+  
+  console.log("已清除所有认证相关cookie和localStorage项");
 }
 
 // 需要登录才能访问的路径
@@ -127,6 +133,12 @@ const UNAUTHENTICATED_ROUTES = [
 interface AuthProviderProps {
   children: React.ReactNode;
 }
+
+// 检查当前路径是否是登录页或注册页
+const isAuthPage = (path: string) => {
+  const authPages = ['/auth/login', '/auth/register', '/login', '/register'];
+  return authPages.some(page => path.startsWith(page));
+};
 
 /**
  * 认证上下文提供者组件
@@ -158,6 +170,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           id: session.user?.id,
           email: session.user?.email,
           name: session.user?.name,
+          monthlyKeyVerified: session.user?.monthlyKeyVerified
         }
       });
     }
@@ -345,6 +358,68 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [status, session, logout, pathname, router]);
 
+  // 处理路由变化和会话状态，实现自动重定向
+  useEffect(() => {
+    const path = pathname || '';
+    const url = new URL(window.location.href);
+    const needKey = url.searchParams.get('needKey') === 'true';
+    
+    console.log(`AuthProvider - Session状态: ${status} 用户: ${session?.user?.id || 'undefined'}`);
+    
+    if (status === 'loading') {
+      console.log('AuthProvider - 会话加载中...');
+      return;
+    }
+    
+    if (status === 'authenticated' && session?.user) {
+      console.log(`AuthProvider - 用户已登录，ID: ${session.user.id}`);
+      
+      // 已登录用户尝试访问登录/注册页时，重定向到首页
+      // 但如果URL包含needKey=true参数，表示需要密钥验证，不执行重定向
+      if (isAuthPage(path) && !needKey) {
+        console.log('AuthProvider - 已登录用户尝试访问登录/注册页，重定向到首页');
+        
+        // 检查URL是否带有回调参数
+        const callbackUrl = url.searchParams.get('callbackUrl');
+        
+        // 检查用户的密钥验证状态
+        const monthlyKeyVerified = session.user.monthlyKeyVerified;
+        console.log(`AuthProvider - 用户密钥验证状态: ${monthlyKeyVerified}`);
+        
+        // 如果需要验证密钥，先验证密钥
+        if (monthlyKeyVerified === false) {
+          console.log('AuthProvider - 用户未验证密钥，需要进行验证');
+          
+          // 重新加载当前页面，但添加needKey参数
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.set('needKey', 'true');
+          
+          if (!currentUrl.href.includes('needKey=true')) {
+            router.push(currentUrl.href);
+            return;
+          }
+          
+          // 如果当前URL已有needKey参数，不执行重定向，等待密钥验证
+          return;
+        }
+        
+        // 用户已验证密钥，可以重定向到目标页面
+        if (callbackUrl) {
+          // 如果有回调URL，优先使用回调参数重定向
+          router.push(callbackUrl);
+        } else {
+          // 否则重定向到首页
+          router.push('/');
+        }
+      }
+    } else if (status === 'unauthenticated') {
+      // 未认证状态 - 清除本地用户状态
+      logout();
+      setShowContent(true);
+      console.log("AuthProvider - 用户未登录");
+    }
+  }, [status, pathname, router, session]);
+
   // 只有当状态确定后才显示内容
   if (!showContent && status === 'loading') {
     return <div className="min-h-screen flex items-center justify-center">
@@ -361,7 +436,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 // 使用认证的自定义Hook
 export function useAuth() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update: updateSession } = useSession();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -387,6 +462,14 @@ export function useAuth() {
       if (result.error) {
         setError(result.error || "登录失败");
         return false;
+      }
+      
+      // 登录成功后，获取最新会话数据
+      try {
+        await updateSession();
+        console.log("登录成功，会话已更新");
+      } catch (updateErr) {
+        console.error("会话更新失败:", updateErr);
       }
       
       router.refresh();
@@ -448,9 +531,26 @@ export function useAuth() {
   const logout = async (): Promise<void> => {
     setLoading(true);
     try {
+      // 尝试通过API清除会话完整性标记
+      try {
+        await fetch('/api/auth/session-complete', {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        console.log("已通过API清除会话完整性标记");
+      } catch (apiError) {
+        console.error("通过API清除会话完整性标记失败:", apiError);
+      }
+      
       // 清除认证相关cookie
       if (typeof clearAuthCookies === 'function') {
         clearAuthCookies();
+      } else {
+        // 如果函数不可用，直接尝试清除重要的cookie
+        document.cookie = "auth_session_complete=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        document.cookie = "x-session-user=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        localStorage.removeItem('auth_session_complete');
+        localStorage.removeItem('monthly_key_status_cache');
       }
       
       // 执行正式登出
@@ -469,6 +569,7 @@ export function useAuth() {
     error,
     login,
     register,
-    logout
+    logout,
+    updateSession  // 添加updateSession方法，允许组件手动更新会话
   };
 }

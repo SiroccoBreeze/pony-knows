@@ -20,7 +20,11 @@ import {
   Bell,
   Reply,
   ExternalLink,
-  MailCheck
+  MailCheck,
+  Loader2,
+  MoreHorizontal,
+  CheckCheck,
+  Link as LinkIcon
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -31,6 +35,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { Separator } from "@/components/ui/separator";
+import Link from "next/link";
 
 type MessageType = "reply" | "system";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -22,7 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Info } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { getSystemParameterWithDefault } from "@/lib/system-parameters";
@@ -51,9 +51,16 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [lockExpiry, setLockExpiry] = useState<Date | null>(null);
   const [isEnabled, setIsEnabled] = useState(true); // 默认启用月度密钥验证
+  const [didMount, setDidMount] = useState(false); // 追踪组件是否已挂载
   const { user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isLoginPage = pathname?.includes('/auth/login') || false;
+  const needKey = searchParams?.get('needKey') === 'true';
   const { data: session, update: updateSession } = useSession();
+  const initChecked = useRef(false);
+  const statusCheckComplete = useRef(false); // 用于防止多次状态检查
 
   const form = useForm<KeyAuthFormValues>({
     resolver: zodResolver(keyAuthSchema),
@@ -62,8 +69,23 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
     },
   });
 
+  // 当组件挂载时，设置didMount为true
+  useEffect(() => {
+    setDidMount(true);
+    
+    // 如果是登录页面且有needKey参数，立即显示验证框
+    if (isLoginPage && needKey) {
+      console.log("检测到登录页面且有needKey参数，立即显示验证框");
+      setOpen(true);
+    }
+    
+    return () => setDidMount(false);
+  }, [isLoginPage, needKey]);
+
   // 检查是否已锁定
   useEffect(() => {
+    if (!didMount) return; // 组件未挂载，不执行
+
     const lockedUntil = localStorage.getItem('monthly_key_locked_until');
     if (lockedUntil) {
       const expiryTime = new Date(lockedUntil);
@@ -92,15 +114,35 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
     if (savedAttempts) {
       setAttempts(parseInt(savedAttempts));
     }
-  }, []);
+  }, [didMount]);
 
   // 检查是否启用月度密钥验证功能
   useEffect(() => {
+    if (!didMount) return; // 组件未挂载，不执行
+    
     const checkFeatureEnabled = async () => {
       try {
+        // 从localStorage中检查缓存的启用状态，避免重复请求
+        const cachedEnabled = localStorage.getItem('monthly_key_feature_enabled');
+        
+        if (cachedEnabled !== null) {
+          const enabled = cachedEnabled === 'true';
+          setIsEnabled(enabled);
+          
+          if (!enabled) {
+            console.log("月度密钥验证功能已禁用 (缓存)");
+            setOpen(false);
+            if (onSuccess) onSuccess();
+          }
+          return;
+        }
+        
         const enabledValue = await getSystemParameterWithDefault('enable_monthly_key', 'true');
         const enabled = enabledValue === 'true';
         setIsEnabled(enabled);
+        
+        // 缓存启用状态，减少重复请求
+        localStorage.setItem('monthly_key_feature_enabled', enabled.toString());
         
         if (!enabled) {
           console.log("月度密钥验证功能已禁用");
@@ -113,16 +155,57 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
     };
     
     checkFeatureEnabled();
-  }, [onSuccess]);
+  }, [onSuccess, didMount]);
 
   // 获取密钥状态
-  const checkKeyStatus = async () => {
+  const checkKeyStatus = useCallback(async (force = false) => {
+    if (!didMount) return; // 组件未挂载，不执行
+    
+    // 如果在登录页面且有needKey参数，优先显示验证框
+    if (isLoginPage && needKey && !statusCheckComplete.current) {
+      console.log("登录页面检测到needKey参数，优先显示验证框");
+      setOpen(true);
+      statusCheckComplete.current = true;
+      return;
+    }
+    
+    if (statusCheckComplete.current && !force) return; // 已完成状态检查，除非强制刷新
+    
     try {
+      // 避免重复检查
+      if (!force) {
+        // 检查是否已经有密钥状态缓存且未过期
+        const keyStatusCache = localStorage.getItem('monthly_key_status_cache');
+        const keyStatusTimestamp = localStorage.getItem('monthly_key_status_timestamp');
+        
+        if (keyStatusCache && keyStatusTimestamp) {
+          const timestamp = parseInt(keyStatusTimestamp, 10);
+          const now = Date.now();
+          
+          // 缓存有效期为5分钟
+          if (now - timestamp < 5 * 60 * 1000) {
+            console.log("使用缓存的密钥状态");
+            const cachedData = JSON.parse(keyStatusCache);
+            
+            // 如果密钥未验证，打开对话框
+            if (!cachedData.verified && needKey) {
+              setOpen(true);
+            } else {
+              setOpen(false);
+              if (onSuccess) onSuccess();
+            }
+            statusCheckComplete.current = true;
+            return;
+          }
+        }
+      }
+      
       // 如果功能已禁用，不执行验证
       if (!isEnabled) {
         console.log("月度密钥验证功能已禁用，跳过验证");
         setOpen(false);
         if (onSuccess) onSuccess();
+        statusCheckComplete.current = true;
         return;
       }
       
@@ -131,13 +214,44 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
       if (skipped === 'true') {
         console.log("用户已跳过密钥验证，不再显示验证对话框");
         setOpen(false);
+        statusCheckComplete.current = true;
         return;
       }
       
-      const response = await fetch("/api/auth/monthly-key");
+      // 如果当前不在登录页面且无needKey参数，不显示对话框
+      if (!needKey && !isLoginPage) {
+        console.log("非登录页面且无needKey参数，不显示密钥验证框");
+        setOpen(false);
+        statusCheckComplete.current = true;
+        return;
+      }
+      
+      // 检查会话状态
+      if (!session || !session.user) {
+        console.log("用户未登录，跳过密钥验证");
+        setOpen(false);
+        statusCheckComplete.current = true;
+        return;
+      }
+      
+      // 使用带凭证的请求确保会话Cookie被发送
+      const response = await fetch("/api/auth/monthly-key", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store",
+          "Pragma": "no-cache"
+        }
+      });
+      
       const data = await response.json();
       
       if (response.ok) {
+        // 缓存密钥状态
+        localStorage.setItem('monthly_key_status_cache', JSON.stringify(data));
+        localStorage.setItem('monthly_key_status_timestamp', Date.now().toString());
+        
         // 检查本地缓存的锁定状态与服务器状态是否一致
         const locallyLocked = isLocked;
         const serverLocked = data.locked === true;
@@ -157,69 +271,62 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
           }
         }
         
-        // 如果密钥未验证，显示对话框
-        if (!data.verified) {
+        // 如果密钥未验证且需要密钥验证，显示对话框
+        if (!data.verified && needKey) {
           setOpen(true);
         } else {
           setOpen(false);
           if (onSuccess) onSuccess();
         }
+        
+        statusCheckComplete.current = true;
       } else {
-        console.error("获取密钥状态失败:", data.error);
+        // 改进的错误处理
+        const errorMessage = data.error || "获取密钥状态失败";
+        console.error("获取密钥状态失败:", errorMessage);
+        
+        // 如果是401未授权错误且在登录页面，这是预期行为，不显示错误
+        if (response.status === 401 && isLoginPage) {
+          console.log("登录页面上的未授权状态是预期的，继续显示密钥验证框");
+          setOpen(true);
+          statusCheckComplete.current = true;
+          return;
+        }
+        
+        // 设置状态以继续显示验证框
+        if (needKey) {
+          setOpen(true);
+          statusCheckComplete.current = true;
+        }
       }
     } catch (err) {
       console.error("密钥状态请求错误:", err);
-    }
-  };
-
-  // 当用户登录状态变化时检查密钥状态
-  useEffect(() => {
-    // 封装checkKeyStatus，避免依赖问题
-    const checkStatus = () => {
-      if (user && session?.user?.id) {
-        checkKeyStatus();
+      
+      // 如果在登录页并且需要密钥验证，即使出错也显示验证框
+      if (isLoginPage && needKey) {
+        console.log("即使请求失败，因为在登录页且需要密钥，继续显示验证框");
+        setOpen(true);
+        statusCheckComplete.current = true;
       }
-    };
-    
-    if (user && session?.user?.id) {
-      // 初始加载时检查密钥状态
-      checkStatus();
-      
-      // 定期检查密钥状态，每30秒检查一次
-      const intervalId = setInterval(() => {
-        if (isLocked) {
-          console.log("定期检查密钥状态...");
-          checkStatus();
-        }
-      }, 30000); // 30秒
-      
-      // 当页面获得焦点时检查状态
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible' && isLocked) {
-          console.log("页面获得焦点，检查密钥状态...");
-          checkStatus();
-        }
-      };
-      
-      // 当窗口获得焦点时检查状态
-      const handleFocus = () => {
-        if (isLocked) {
-          console.log("窗口获得焦点，检查密钥状态...");
-          checkStatus();
-        }
-      };
-      
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('focus', handleFocus);
-      
-      return () => {
-        clearInterval(intervalId);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('focus', handleFocus);
-      };
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isLocked, session?.user?.id]);
+  }, [isEnabled, isLocked, onSuccess, didMount, needKey, isLoginPage, session]);
+
+  // 检查用户的密钥状态并在需要时显示验证框
+  useEffect(() => {
+    // 如果在登录页面且有needKey参数，立即显示验证框
+    if (isLoginPage && needKey) {
+      console.log("登录页面检测到needKey参数，立即显示验证框");
+      setOpen(true);
+      return;
+    }
+    
+    // 初次检查密钥状态
+    if (didMount && !initChecked.current) {
+      console.log("初次检查密钥状态...");
+      initChecked.current = true;
+      checkKeyStatus();
+    }
+  }, [checkKeyStatus, didMount, isLoginPage, needKey]);
 
   // 锁定验证功能
   const lockVerification = () => {
@@ -257,7 +364,7 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
         });
         
         // 确保会话更新被应用 - 增加延迟时间
-        await new Promise(resolve => setTimeout(resolve, 500)); // 延长延迟确保更新生效
+        await new Promise(resolve => setTimeout(resolve, 300)); // 减少延迟确保更新生效
         
         console.log(`已更新会话中的月度密钥验证状态: ${verified}`);
         
@@ -289,7 +396,7 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
                   monthlyKeyVerified: verified
                 }
               });
-              await new Promise(resolve => setTimeout(resolve, 500)); // 再次等待确保更新生效
+              await new Promise(resolve => setTimeout(resolve, 300)); // 再次等待确保更新生效
             }
             
             return true;
@@ -319,11 +426,14 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
       
       const response = await fetch("/api/auth/monthly-key", {
         method: "POST",
+        credentials: "include", // 确保发送认证Cookie
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ key: normalizedKey }),
       });
+      
+      const data = await response.json();
       
       if (response.ok) {
         // 验证成功，重置尝试次数
@@ -340,51 +450,55 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
         // 移除跳过验证标记
         localStorage.removeItem('monthly_key_verification_skipped');
         
-        // 检查URL是否包含callbackUrl参数
-        if (typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          const callbackUrlParam = url.searchParams.get('callbackUrl');
+        // 标记密钥已验证，避免再次弹出验证框
+        localStorage.setItem('monthly_key_status_cache', JSON.stringify({verified: true}));
+        localStorage.setItem('monthly_key_status_timestamp', Date.now().toString());
+        
+        // 设置完整会话状态的标志，避免后续重新登录
+        localStorage.setItem('auth_session_complete', 'true');
+        
+        // 设置cookie时包含用户ID信息，便于中间件验证cookie的有效性
+        if (user?.id) {
+          // 添加一个请求头标记，包含用户ID信息
+          const headers = new Headers();
+          headers.append('x-session-user', user.id);
           
-          if (callbackUrlParam) {
-            // 解码callbackUrl，避免重复编码导致的问题
-            const callbackUrl = callbackUrlParam.startsWith('http')
-              ? decodeURIComponent(callbackUrlParam)
-              : callbackUrlParam;
-              
-            // 设置完整会话状态的标志，避免后续重新登录
-            localStorage.setItem('auth_session_complete', 'true');
-            document.cookie = 'auth_session_complete=true; path=/; max-age=3600'; // 1小时有效
-              
-            // 使用较短的延迟确保所有状态都已更新，但不需要太长时间
-            setTimeout(() => {
-              console.log(`密钥验证成功，正在重定向到: ${callbackUrl}`);
-              
-              // 检查是否是登录页重定向
-              if (callbackUrl.includes('/auth/login')) {
-                // 防止循环重定向，直接跳转到首页
-                window.location.replace('/');
-              } else {
-                // 使用window.location.replace替代router.push确保页面完全刷新
-                window.location.replace(callbackUrl);
-              }
-            }, 500); // 减少延迟时间
-            
-            return; // 防止执行下面的刷新操作
-          }
+          // 发送一个请求来设置带有用户信息的auth_session_complete cookie
+          await fetch('/api/auth/session-complete', {
+            method: 'POST',
+            headers: headers,
+            credentials: 'include'
+          });
+          
+          console.log(`已设置带有用户ID(${user.id})的会话完整标记`);
+        } else {
+          // 后备方案：如果无法获取用户ID，仍然设置基本的cookie
+          document.cookie = 'auth_session_complete=true; path=/; max-age=3600';
+          console.log("未能获取用户ID，已设置基本的会话完整标记");
         }
         
-        // 如果没有回调URL，刷新页面确保状态一致
-        // 设置完整会话状态的标志
-        localStorage.setItem('auth_session_complete', 'true');
-        document.cookie = 'auth_session_complete=true; path=/; max-age=3600'; // 1小时有效
+        // 密钥验证成功后的回调
+        if (onSuccess) {
+          onSuccess();
+        }
         
-        setTimeout(() => {
-          window.location.replace('/');
-        }, 500); // 减少延迟时间
-        
-        if (onSuccess) onSuccess();
+        // 如果在登录页面，完成验证后处理导航
+        if (isLoginPage && router) {
+          // 添加短延迟，确保会话状态已更新
+          setTimeout(() => {
+            // 解析原始URL，提取callbackUrl参数
+            const url = new URL(window.location.href);
+            const callbackUrl = url.searchParams.get('callbackUrl') || '/';
+            
+            // 导航到回调URL
+            console.log("密钥验证成功，重定向到:", callbackUrl);
+            window.location.href = callbackUrl;
+          }, 500);
+        }
       } else {
-        const data = await response.json();
+        // 改进的错误处理
+        const errorMessage = data.error || `密钥验证失败，请重试`;
+        
         // 验证失败，增加尝试次数
         const newAttempts = attempts + 1;
         setAttempts(newAttempts);
@@ -395,10 +509,11 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
           lockVerification();
           setError(`密钥验证失败次数过多，已锁定30分钟`);
         } else {
-          setError(data.error || `密钥验证失败，还剩 ${MAX_ATTEMPTS - newAttempts} 次尝试机会`);
+          setError(errorMessage || `密钥验证失败，还剩 ${MAX_ATTEMPTS - newAttempts} 次尝试机会`);
         }
       }
-    } catch {
+    } catch (err) {
+      console.error("密钥验证请求错误:", err);
       setError("验证请求失败，请检查网络连接");
     } finally {
       setIsVerifying(false);
@@ -516,22 +631,23 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
             const url = new URL(window.location.href);
             const needKeyParam = url.searchParams.get('needKey');
             
-            // 只有当是从密钥验证流程来的情况下才执行清除会话
-            if (needKeyParam === 'true') {
-              console.log("用户关闭密钥验证，直接清除会话");
-              
+            // 当用户关闭密钥验证框时，执行登出操作
+            setTimeout(() => {
               // 使用NextAuth的signOut函数，但不进行自动重定向
               signOut({ 
                 redirect: false,
                 callbackUrl: '/auth/login'
               }).then(() => {
-                console.log("会话已清除，准备跳转到登录页");
+                console.log("用户关闭密钥验证，会话已清除，准备跳转到登录页");
                 // 直接清除localStorage中的所有相关数据
                 localStorage.removeItem('monthly_key_verification_skipped');
                 localStorage.removeItem('monthly_key_attempts');
                 localStorage.removeItem('monthly_key_locked_until');
                 localStorage.removeItem('cached_permissions');
                 localStorage.removeItem('cached_permissions_timestamp');
+                localStorage.removeItem('auth_session_complete');
+                localStorage.removeItem('monthly_key_status_cache');
+                localStorage.removeItem('monthly_key_status_timestamp');
                 
                 // 清除所有相关cookie
                 document.cookie.split(';').forEach(cookie => {
@@ -539,10 +655,10 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
                   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
                 });
                 
-                // 直接重定向到登录页，不显示登出确认页面
-                window.location.replace('/auth/login');
+                // 登出后重定向到登录页
+                window.location.href = '/auth/login';
               });
-            }
+            }, 100);
           }
         }}
       >

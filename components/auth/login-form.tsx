@@ -67,12 +67,22 @@ interface LoginFormProps {
 export function LoginForm({ onSuccess }: LoginFormProps) {
   const { login, error: authError, loading } = useAuth();
   const [error, setError] = React.useState<string | null>(null);
+  const loginCompleted = React.useRef(false);
 
   useEffect(() => {
     if (authError) {
       setError(authError);
     }
   }, [authError]);
+
+  // 检查URL是否包含needKey参数，这表示需要密钥验证
+  const hasNeedKeyParam = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      return url.searchParams.get('needKey') === 'true';
+    }
+    return false;
+  }, []);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -89,9 +99,25 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       const success = await login(data.email, data.password);
       if (success) {
         form.reset();
+        loginCompleted.current = true;
         
-        // 登录成功后直接调用回调，不直接检查月度密钥状态
-        // 让全局组件和中间件处理密钥验证
+        // 如果有needKey参数，表示需要密钥验证
+        if (hasNeedKeyParam) {
+          console.log("登录成功，需要密钥验证，暂不调用onSuccess");
+          // 不立即调用onSuccess回调，等待密钥验证组件显示
+          
+          // 标记为已完成一阶段登录，避免多次处理
+          localStorage.setItem('login_pending_key_verification', 'true');
+          
+          // 短暂延迟后刷新页面，确保URL参数能被正确处理
+          setTimeout(() => {
+            // 保持URL参数不变
+            window.location.reload();
+          }, 100);
+          return;
+        }
+        
+        // 如果不需要密钥验证，正常调用onSuccess回调
         onSuccess?.();
       }
     } catch (err) {
