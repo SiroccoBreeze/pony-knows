@@ -34,6 +34,36 @@ export default function LoginPage() {
         monthlyKeyVerified: (user as any).monthlyKeyVerified
       });
       
+      // 检查是否有完整会话标记
+      const checkSessionComplete = () => {
+        // 从localStorage和cookie中检查完整会话标记
+        const sessionCompleteLocalStorage = typeof window !== 'undefined' ? 
+          localStorage.getItem('auth_session_complete') : null;
+          
+        const getCookieValue = (name: string) => {
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+          return match ? match[2] : '';
+        };
+        
+        const sessionCompleteCookie = getCookieValue('auth_session_complete');
+        
+        // 如果存在完整会话标记，跳过后续流程直接跳转
+        if (sessionCompleteLocalStorage === 'true' || sessionCompleteCookie === 'true') {
+          console.log("检测到完整会话标记，直接重定向到:", callbackUrl);
+          setTimeout(() => {
+            window.location.replace(callbackUrl);
+          }, 100);
+          return true;
+        }
+        
+        return false;
+      };
+      
+      // 首先检查完整会话标记
+      if (checkSessionComplete()) {
+        return;
+      }
+      
       // 如果有needKey参数，中间件可能将用户重定向到此页面进行密钥验证
       // 在这种情况下不自动跳转，让MonthlyKeyAuth组件处理验证流程
       if (needKey === 'true') {

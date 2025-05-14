@@ -51,11 +51,18 @@ function isKeyExemptPath(path: string): boolean {
 }
 
 // 检查用户的密钥验证状态（从cookie或令牌中）
-function hasValidMonthlyKeyFromSession(token: JWT): boolean {
+function hasValidMonthlyKeyFromSession(token: JWT, request: NextRequest): boolean {
   try {
     // 详细记录token的内容，帮助调试
     const tokenKeys = Object.keys(token).filter(k => k !== 'iat' && k !== 'exp' && k !== 'jti');
     console.log(`[中间件] 检查用户 ${token.sub} 的密钥验证状态，token字段: ${tokenKeys.join(', ')}`);
+    
+    // 检查是否有完整会话标记
+    const sessionCompleteCookie = request.cookies.get('auth_session_complete');
+    if (sessionCompleteCookie?.value === 'true') {
+      console.log(`[中间件] 用户 ${token.sub} 具有完整会话标记，跳过密钥验证`);
+      return true;
+    }
     
     // 明确检查月度密钥验证标志
     if (token.monthlyKeyVerified === true) {
@@ -176,7 +183,7 @@ export async function middleware(request: NextRequest) {
       const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
       
       // 从会话中获取验证状态
-      const hasValidKey = hasValidMonthlyKeyFromSession(token);
+      const hasValidKey = hasValidMonthlyKeyFromSession(token, request);
       
       // 如果不是管理员路由，并且没有有效密钥，重定向到登录/密钥验证页面
       if (!isAdminRoute && !hasValidKey) {

@@ -351,7 +351,11 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
               ? decodeURIComponent(callbackUrlParam)
               : callbackUrlParam;
               
-            // 使用较长的延迟确保所有状态都已更新
+            // 设置完整会话状态的标志，避免后续重新登录
+            localStorage.setItem('auth_session_complete', 'true');
+            document.cookie = 'auth_session_complete=true; path=/; max-age=3600'; // 1小时有效
+              
+            // 使用较短的延迟确保所有状态都已更新，但不需要太长时间
             setTimeout(() => {
               console.log(`密钥验证成功，正在重定向到: ${callbackUrl}`);
               
@@ -363,16 +367,20 @@ export function MonthlyKeyAuth({ onSuccess }: MonthlyKeyAuthProps) {
                 // 使用window.location.replace替代router.push确保页面完全刷新
                 window.location.replace(callbackUrl);
               }
-            }, 1000); // 延长延迟确保状态更新完成
+            }, 500); // 减少延迟时间
             
             return; // 防止执行下面的刷新操作
           }
         }
         
         // 如果没有回调URL，刷新页面确保状态一致
+        // 设置完整会话状态的标志
+        localStorage.setItem('auth_session_complete', 'true');
+        document.cookie = 'auth_session_complete=true; path=/; max-age=3600'; // 1小时有效
+        
         setTimeout(() => {
           window.location.replace('/');
-        }, 1000);
+        }, 500); // 减少延迟时间
         
         if (onSuccess) onSuccess();
       } else {
