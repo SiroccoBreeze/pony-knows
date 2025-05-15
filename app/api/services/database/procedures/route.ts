@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth/options";
 import sql from "mssql";
+import { getDbPool } from "@/lib/db";
 
 // 数据库配置
 const sqlConfig = {
@@ -35,7 +36,14 @@ interface ExtendedSession {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    permissions?: string[]; // 添加权限数组
   };
+}
+
+// 检查用户是否有访问数据库的权限
+function hasAccessDatabasePermission(session: ExtendedSession): boolean {
+  if (!session?.user?.permissions) return false;
+  return session.user.permissions.includes('access_database');
 }
 
 export async function GET(request: Request) {
@@ -61,8 +69,17 @@ export async function GET(request: Request) {
       );
     }
 
-    // 创建数据库连接池
-    pool = await new sql.ConnectionPool(sqlConfig).connect();
+    // 检查用户是否有访问数据库的权限
+    if (!hasAccessDatabasePermission(session)) {
+      console.log("用户无权访问数据库存储过程API:", session.user.id, "权限:", session.user.permissions);
+      return NextResponse.json(
+        { error: "无权访问数据库", requiredPermission: "access_database" },
+        { status: 403 }
+      );
+    }
+
+    // 使用getDbPool获取数据库连接池
+    pool = await getDbPool();
 
     // 构建LIKE查询条件
     let whereClause = "p.is_ms_shipped = 0";

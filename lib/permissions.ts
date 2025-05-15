@@ -2,6 +2,11 @@
 export enum AdminPermission {
   // 管理员基础访问权限
   ADMIN_ACCESS = "admin_access",  // 拥有此权限自动拥有所有功能
+  
+  // 角色管理权限
+  VIEW_ROLES = "view_roles",       // 查看角色权限
+  EDIT_ROLE = "edit_role",         // 编辑角色权限
+  DELETE_ROLE = "delete_role",     // 删除角色权限
 }
 
 // 用户端权限 - 简化为页面级别访问控制

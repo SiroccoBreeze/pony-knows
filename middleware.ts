@@ -114,8 +114,8 @@ function hasValidMonthlyKeyFromSession(token: JWT, request: NextRequest): boolea
     return false;
   } catch (error) {
     console.error("检查密钥状态错误:", error);
-    // 出错时不应阻止用户访问，返回true
-    return true;
+    // 出错时不应阻止用户访问，使其重新验证
+    return false;
   }
 }
 
@@ -227,6 +227,13 @@ export async function middleware(request: NextRequest) {
           return NextResponse.next();
         }
         
+        // 检查是否已经在验证密钥的过程中（通过localStorage或cookie标记）
+        const hasPendingKeyVerification = request.cookies.get('login_pending_key_verification')?.value === 'true';
+        if (hasPendingKeyVerification) {
+          console.log('[中间件] 检测到正在进行密钥验证，避免重复重定向');
+          return NextResponse.next();
+        }
+        
         // 检查回调URL是否安全
         const safeCallbackUrl = isSafeCallbackUrl(originalUrl) ? originalUrl : '/';
         
@@ -234,6 +241,9 @@ export async function middleware(request: NextRequest) {
         const loginUrl = new URL('/auth/login', request.url);
         loginUrl.searchParams.set('callbackUrl', safeCallbackUrl);
         loginUrl.searchParams.set('needKey', 'true'); // 指示需要验证密钥
+        
+        // 添加一个随机参数，避免浏览器缓存
+        loginUrl.searchParams.set('_', Date.now().toString());
         
         return NextResponse.redirect(loginUrl);
       }

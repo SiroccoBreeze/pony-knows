@@ -19,82 +19,32 @@ export default function LoginPage() {
   const needKey = searchParams.get('needKey') === 'true';
   const { user } = useAuth();
   // 用于防止重复处理导航的状态标记
-  const preventUnnecessaryRedirects = React.useRef(false);
+  const loginCompleted = React.useRef(false);
   
-  // 如果用户已登录，重定向到回调URL
+  // 如果用户已登录且不需要密钥验证，直接跳转
   React.useEffect(() => {
-    if (user && !preventUnnecessaryRedirects.current) {
+    if (user && !loginCompleted.current && !needKey) {
       // 记录已处理，避免重复处理
-      preventUnnecessaryRedirects.current = true;
+      loginCompleted.current = true;
       
-      // 使用解码后的URL进行导航
-      console.log("用户已登录，准备处理导航到:", callbackUrl);
-      
-      // 详细记录用户对象，帮助调试
-      console.log("当前用户状态:", {
-        id: (user as any).id,
-        name: (user as any).name,
-        monthlyKeyVerified: (user as any).monthlyKeyVerified
-      });
-      
-      // 如果URL中有needKey=true参数，表示需要密钥验证
-      if (needKey) {
-        console.log("检测到needKey参数，等待密钥验证...");
-        // 不执行重定向，等待密钥验证框显示
-        return;
-      }
-      
-      // 检查是否有完整会话标记
-      const checkSessionComplete = () => {
-        // 从localStorage和cookie中检查完整会话标记
-        const sessionCompleteLocalStorage = typeof window !== 'undefined' ? 
-          localStorage.getItem('auth_session_complete') : null;
-          
-        const getCookieValue = (name: string) => {
-          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-          return match ? match[2] : '';
-        };
-        
-        const sessionCompleteCookie = getCookieValue('auth_session_complete');
-        
-        // 如果存在完整会话标记，跳过后续流程直接跳转
-        if (sessionCompleteLocalStorage === 'true' || sessionCompleteCookie === 'true') {
-          console.log("检测到完整会话标记，直接重定向到:", callbackUrl);
-          setTimeout(() => {
-            window.location.href = callbackUrl;
-          }, 100);
-          return true;
-        }
-        
-        return false;
-      };
-      
-      // 首先检查完整会话标记
-      if (checkSessionComplete()) {
-        return;
-      }
-      
-      // 如果通过了所有检查，表示用户已登录且不需要验证密钥
-      // 延迟执行以确保DOM已更新
-      setTimeout(() => {
-        window.location.href = callbackUrl;
-      }, 300);
+      // 直接跳转，无需多次检查
+      window.location.href = callbackUrl;
     }
-  }, [user, callbackUrl, searchParams, needKey]);
+  }, [user, callbackUrl, needKey]);
 
   const handleLoginSuccess = () => {
-    // 检查是否需要密钥验证
-    if (needKey) {
-      console.log("登录成功，但需要密钥验证，不自动跳转");
-      // 不进行自动跳转，等待密钥验证组件出现
-      return;
+    if (!loginCompleted.current) {
+      loginCompleted.current = true;
+      
+      // 如果不需要密钥验证，直接跳转到目标页面
+      if (!needKey) {
+        console.log("登录成功，不需要密钥验证，导航到:", callbackUrl);
+        window.location.href = callbackUrl;
+      } else {
+        console.log("登录成功，需要密钥验证，等待密钥验证组件显示");
+        // 不做任何跳转，等待密钥验证组件显示
+      }
     }
-    
-    // 使用解码后的URL进行导航
-    console.log("登录成功，重定向到:", callbackUrl);
-    setTimeout(() => {
-      window.location.href = callbackUrl;
-    }, 300);
   };
 
   return (

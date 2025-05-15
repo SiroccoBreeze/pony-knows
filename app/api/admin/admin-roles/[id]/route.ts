@@ -9,9 +9,10 @@ import { createAdminLog } from '@/lib/admin-logs';
 // 获取单个角色详情
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
+    const { params } = context;
     // 检查权限
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -58,9 +59,10 @@ export async function GET(
 // 更新角色
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
+    const { params } = context;
     // 检查权限
     const session = await getServerSession(authOptions);
     if (!session?.user) {
@@ -165,9 +167,10 @@ export async function PUT(
 // 删除角色
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
+    const { params } = context;
     // 检查权限
     const session = await getServerSession(authOptions);
     if (!session?.user) {

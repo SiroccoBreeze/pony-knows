@@ -83,6 +83,19 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     }
     return false;
   }, []);
+  
+  // 添加一个钩子，监听登录完成的标记，显示验证框
+  useEffect(() => {
+    const loginPending = localStorage.getItem('login_pending_key_verification');
+    if (loginPending === 'true' && hasNeedKeyParam) {
+      console.log("检测到登录后等待密钥验证标记，准备调用onSuccess");
+      // 准备调用onSuccess以显示密钥验证框
+      if (onSuccess) {
+        // 直接调用onSuccess回调以显示密钥验证框
+        onSuccess();
+      }
+    }
+  }, [hasNeedKeyParam, onSuccess]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -103,17 +116,15 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
         
         // 如果有needKey参数，表示需要密钥验证
         if (hasNeedKeyParam) {
-          console.log("登录成功，需要密钥验证，暂不调用onSuccess");
-          // 不立即调用onSuccess回调，等待密钥验证组件显示
+          console.log("登录成功，需要密钥验证");
           
           // 标记为已完成一阶段登录，避免多次处理
           localStorage.setItem('login_pending_key_verification', 'true');
+          // 设置cookie以便中间件能够识别
+          document.cookie = 'login_pending_key_verification=true; path=/; max-age=300'; // 5分钟有效
           
-          // 短暂延迟后刷新页面，确保URL参数能被正确处理
-          setTimeout(() => {
-            // 保持URL参数不变
-            window.location.reload();
-          }, 100);
+          // 立即调用onSuccess回调显示密钥验证框
+          onSuccess?.();
           return;
         }
         

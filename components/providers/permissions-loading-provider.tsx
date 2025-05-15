@@ -25,6 +25,7 @@ export function PermissionsLoadingProvider({ children }: PermissionsLoadingProvi
   const { startLoading, stopLoading } = useLoadingStore();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUnmountedRef = useRef(false);
+  const permissionCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // 检查会话是否有效
   const isSessionValid = status === "authenticated" && !!session?.user?.id;
@@ -48,9 +49,48 @@ export function PermissionsLoadingProvider({ children }: PermissionsLoadingProvi
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      if (permissionCheckTimeoutRef.current) {
+        clearTimeout(permissionCheckTimeoutRef.current);
+        permissionCheckTimeoutRef.current = null;
+      }
       stopLoading();
     };
   }, [session, status, stopLoading, isSessionValid]);
+  
+  // 防止刷新页面时的错误重定向
+  useEffect(() => {
+    // 如果组件已卸载，不执行任何操作
+    if (isUnmountedRef.current) return;
+    
+    // 检查当前路径
+    const path = window.location.pathname;
+    
+    // 处理数据库访问路径
+    if (path.includes('/database')) {
+      // 检查之前的权限确认标记
+      const accessVerified = sessionStorage.getItem('database_access_verified');
+      
+      if (accessVerified === 'true') {
+        console.log("[权限提供者] 数据库访问已预先确认，跳过路径检查");
+        return;
+      }
+      
+      // 如果权限已加载完成且包含数据库访问权限
+      if (!isPermissionsLoading && permissions.includes('access_database')) {
+        console.log("[权限提供者] 用户拥有数据库访问权限，设置访问确认");
+        sessionStorage.setItem('database_access_verified', 'true');
+        return;
+      }
+      
+      // 如果权限已加载完成但不包含数据库访问权限，则重定向
+      if (!isPermissionsLoading && permissions.length > 0 && !permissions.includes('access_database')) {
+        console.log("[权限提供者] 用户尝试访问数据库但没有权限，将重定向到权限拒绝页面");
+        localStorage.setItem('last_denied_permission', 'access_database');
+        window.location.href = '/permissions-denied?permission=access_database';
+        return;
+      }
+    }
+  }, [permissions, isPermissionsLoading, isSessionValid]);
   
   // 监听会话状态变化
   useEffect(() => {
@@ -58,6 +98,25 @@ export function PermissionsLoadingProvider({ children }: PermissionsLoadingProvi
     if (isUnmountedRef.current) return;
     
     console.log("[权限提供者] 会话状态变化:", status, "用户:", session?.user?.id ? "已登录" : "未登录");
+    
+    // 检查用户权限 - 但只在权限加载完成后进行路径检查
+    if (status === "authenticated" && session?.user && !isPermissionsLoading && permissions.length > 0) {
+      // 清除之前的权限检查超时
+      if (permissionCheckTimeoutRef.current) {
+        clearTimeout(permissionCheckTimeoutRef.current);
+      }
+      
+      // 延迟权限检查以确保页面渲染和权限完全加载
+      permissionCheckTimeoutRef.current = setTimeout(() => {
+        // 获取用户权限
+        const userPermissions = session.user.permissions || [];
+        
+        // 记录用户权限，以便调试
+        console.log("[权限提供者] 用户权限:", userPermissions);
+        
+        permissionCheckTimeoutRef.current = null;
+      }, 300); // 添加300ms延迟，确保页面完全加载
+    }
     
     // 根据会话状态采取不同行动
     if (status === "unauthenticated") {
@@ -85,7 +144,7 @@ export function PermissionsLoadingProvider({ children }: PermissionsLoadingProvi
         console.log("[权限提供者] 用户已登录(ID:", session.user.id, ")，正在等待权限加载");
       }
     }
-  }, [status, session, isReady, stopLoading, isLoggedIn]);
+  }, [status, session, isReady, stopLoading, isLoggedIn, isPermissionsLoading, permissions]);
   
   // 监听权限加载状态，仅当用户已登录时
   useEffect(() => {
